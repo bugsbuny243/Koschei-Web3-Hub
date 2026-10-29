@@ -132,3 +132,32 @@ func TestFabricCampaignEvidenceContractTamperFailsClosed(t *testing.T) {
 		t.Fatalf("expected hash mismatch rejection, got %v", err)
 	}
 }
+
+func TestFabricCampaignGoPythonCanonicalDigestVector(t *testing.T) {
+	contract := FabricCampaignEvidenceContract{
+		SchemaVersion:              FabricCampaignEvidenceSchemaVersion,
+		Mode:                       FabricCampaignEvidenceMode,
+		CampaignRef:                "KCAM1-&<>",
+		CampaignRevision:           3,
+		CampaignState:              GlobalCampaignActive,
+		CampaignEvidenceHashSHA256: "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+		RulesetVersion:             "campaign-rules.v1",
+		FirstObservedAt:            time.Date(2026, 10, 2, 9, 0, 0, 0, time.UTC),
+		LastObservedAt:             time.Date(2026, 10, 2, 10, 0, 0, 0, time.UTC),
+		Networks:                   []string{"ethereum", "solana"},
+		Subjects:                   []string{"subject:a"},
+		EvidenceRefs:               []string{"obs:1"},
+		VerdictRefs:                []string{"verdict:1"},
+		AttackPathRefs:             []string{},
+		MissingEvidence:            []string{},
+		IncidentRefs:               []FabricCampaignIncidentRef{},
+	}
+	const expected = "sha256:26e41702e842327415c7ed48d3ae548da8d5e7ca165ce09df771f607183a6832"
+	if actual := hashFabricCampaignEvidenceContract(contract); actual != expected {
+		t.Fatalf("Go/Python Fabric digest mismatch: got %s want %s", actual, expected)
+	}
+	contract.ContractHashSHA256 = expected
+	if err := ValidateFabricCampaignEvidenceContract(contract); err != nil {
+		t.Fatalf("canonical Go/Python fixture failed validation: %v", err)
+	}
+}
