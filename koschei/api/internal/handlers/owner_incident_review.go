@@ -15,12 +15,12 @@ const ownerIncidentReviewPayloadKey = "soc_owner_review_v1"
 const ownerIncidentReviewEventName = "owner_review_recorded"
 
 type ownerIncidentReviewProof struct {
-	EvidenceState            string    `json:"evidence_state"`
-	Actor                    string    `json:"actor"`
-	FirstRecordedAt          time.Time `json:"first_recorded_at"`
-	LatestRecordedAt         time.Time `json:"latest_recorded_at"`
-	RecordCount              int64     `json:"record_count"`
-	SecondsFromCaseCreation  int64     `json:"seconds_from_case_creation"`
+	EvidenceState           string    `json:"evidence_state"`
+	Actor                   string    `json:"actor"`
+	FirstRecordedAt         time.Time `json:"first_recorded_at"`
+	LatestRecordedAt        time.Time `json:"latest_recorded_at"`
+	RecordCount             int64     `json:"record_count"`
+	SecondsFromCaseCreation int64     `json:"seconds_from_case_creation"`
 }
 
 func ownerIncidentReviewEvent() (string, map[string]any) {
