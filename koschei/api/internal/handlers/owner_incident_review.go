@@ -78,11 +78,11 @@ func ownerIncidentReviewProofs(ctx context.Context, db *sql.DB, incidents []owne
 			return nil, fmt.Errorf("owner review audit inconsistent for case %s", id)
 		}
 		proofs[id] = ownerIncidentReviewProof{
-			EvidenceState: "owner_manual_review_recorded",
-			Actor: "owner",
-			FirstRecordedAt: first,
-			LatestRecordedAt: last,
-			RecordCount: count,
+			EvidenceState:           "owner_manual_review_recorded",
+			Actor:                   "owner",
+			FirstRecordedAt:         first,
+			LatestRecordedAt:        last,
+			RecordCount:             count,
 			SecondsFromCaseCreation: incidentElapsedSeconds(caseCreated, first),
 		}
 	}
