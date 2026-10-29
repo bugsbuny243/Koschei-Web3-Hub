@@ -46,7 +46,10 @@ func TestSOCRuntimeReadinessPostgresReadOnly(t *testing.T) {
 	if body.Readiness.SampledCases < 0 || body.Readiness.SampledCases > 50 {
 		t.Fatalf("readiness sample limit violated: %d", body.Readiness.SampledCases)
 	}
-	if got := body.Readiness.State; got != socReadinessState(body.Readiness.SampledCases, body.Readiness.AnyAuditedActions) {
+	if body.Readiness.LinkedAuditCases < 0 || body.Readiness.LinkedAuditCases > body.Readiness.SampledCases {
+		t.Fatalf("invalid case/action linkage count: %d", body.Readiness.LinkedAuditCases)
+	}
+	if got := body.Readiness.State; got != socReadinessState(body.Readiness.SampledCases, body.Readiness.AnyAuditedActions, body.Readiness.LinkedAuditCases) {
 		t.Fatalf("unjustified readiness state: %q", got)
 	}
 	if rec.Header().Get("Cache-Control") != "no-store" {
