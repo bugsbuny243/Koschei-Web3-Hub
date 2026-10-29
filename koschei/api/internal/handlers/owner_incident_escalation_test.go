@@ -60,14 +60,14 @@ func TestOwnerIncidentEscalationReadProjectionNeverClaimsAcknowledgement(t *test
 	}
 	items, _, _ := buildOwnerIncidentTriage(incidents, at)
 	applyOwnerIncidentAssignments(items, map[string]ownerIncidentAssignment{
-		"active": {Status: "assigned", Tier: "L1", AnalystID: "soc-001", UpdatedAt: at.Add(-time.Hour)},
-		"changed": {Status: "assigned", Tier: "L3", AnalystID: "soc-002", UpdatedAt: at.Add(time.Minute)},
+		"active":     {Status: "assigned", Tier: "L1", AnalystID: "soc-001", UpdatedAt: at.Add(-time.Hour)},
+		"changed":    {Status: "assigned", Tier: "L3", AnalystID: "soc-002", UpdatedAt: at.Add(time.Minute)},
 		"lower-tier": {Status: "assigned", Tier: "L1", AnalystID: "soc-003", UpdatedAt: at.Add(time.Minute)},
 	})
 	applyOwnerIncidentEscalations(items, map[string]ownerIncidentEscalation{
-		"active":   {State: "requested", TargetTier: "L2", RequestedAt: at},
-		"inactive": {State: "requested", TargetTier: "L3", RequestedAt: at},
-		"changed":  {State: "requested", TargetTier: "L3", RequestedAt: at},
+		"active":     {State: "requested", TargetTier: "L2", RequestedAt: at},
+		"inactive":   {State: "requested", TargetTier: "L3", RequestedAt: at},
+		"changed":    {State: "requested", TargetTier: "L3", RequestedAt: at},
 		"lower-tier": {State: "requested", TargetTier: "L3", RequestedAt: at},
 	})
 	if items[0].Escalation == nil || items[0].Escalation.State != "requested" {
