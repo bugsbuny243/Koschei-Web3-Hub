@@ -503,6 +503,7 @@ func (h *Handler) ownerIncidentAction(w http.ResponseWriter, r *http.Request, id
 		"note": true, "investigate": true, "contain": true, "resolve": true, "reopen": true, "close": true,
 		"severity_change": true, "link_evidence": true, "link_alert": true, "link_dossier": true,
 		"assign_analyst": true, "unassign_analyst": true,
+		"request_escalation": true, "clear_escalation": true,
 	}
 	if !validAction[input.Action] {
 		writeAPIError(w, http.StatusBadRequest, APICodeInvalidInput, "Unsupported incident action")
@@ -524,8 +525,20 @@ func (h *Handler) ownerIncidentAction(w http.ResponseWriter, r *http.Request, id
 		writeAPIError(w, http.StatusBadRequest, APICodeInvalidInput, "Unassignment must not specify an analyst or tier")
 		return
 	}
-	if input.Action != "assign_analyst" && input.Action != "unassign_analyst" && (input.AnalystID != "" || input.Tier != "") {
-		writeAPIError(w, http.StatusBadRequest, APICodeInvalidInput, "Analyst fields are only valid for analyst assignment")
+	if input.Action == "request_escalation" {
+		if input.AnalystID != "" || (input.Tier != "L2" && input.Tier != "L3") || len(input.Summary) < 8 {
+			writeAPIError(w, http.StatusBadRequest, APICodeInvalidInput, "Escalation requires a target L2/L3 tier and an eight-character review rationale")
+			return
+		}
+	}
+	if input.Action == "clear_escalation" && (input.AnalystID != "" || input.Tier != "") {
+		writeAPIError(w, http.StatusBadRequest, APICodeInvalidInput, "Escalation clearing must not specify analyst or tier")
+		return
+	}
+	if input.Action != "assign_analyst" && input.Action != "unassign_analyst" &&
+		input.Action != "request_escalation" && input.Action != "clear_escalation" &&
+		(input.AnalystID != "" || input.Tier != "") {
+		writeAPIError(w, http.StatusBadRequest, APICodeInvalidInput, "Analyst fields are only valid for assignment or escalation")
 		return
 	}
 
@@ -546,10 +559,33 @@ func (h *Handler) ownerIncidentAction(w http.ResponseWriter, r *http.Request, id
 	}
 
 	nextStatus := incidentActionStatus(input.Action)
-	if (input.Action == "assign_analyst" || input.Action == "unassign_analyst") &&
+	if (input.Action == "assign_analyst" || input.Action == "unassign_analyst" ||
+		input.Action == "request_escalation" || input.Action == "clear_escalation") &&
 		currentStatus != "open" && currentStatus != "investigating" && currentStatus != "contained" {
-		writeAPIError(w, http.StatusConflict, APICodeConflict, "Analyst assignments require an active incident")
+		writeAPIError(w, http.StatusConflict, APICodeConflict, "SOC operator actions require an active incident")
 		return
+	}
+	if input.Action == "request_escalation" {
+		tier, err := latestOwnerIncidentAssignmentTier(r.Context(), tx, id)
+		if err != nil {
+			writeAPIError(w, http.StatusServiceUnavailable, APICodeServiceUnavailable, "Analyst assignment ledger is unavailable")
+			return
+		}
+		if incidentAnalystTierRank(input.Tier) <= incidentAnalystTierRank(tier) {
+			writeAPIError(w, http.StatusConflict, APICodeConflict, "Escalation requires an existing lower-tier assignment")
+			return
+		}
+	}
+	if input.Action == "clear_escalation" {
+		state, err := latestOwnerIncidentEscalationState(r.Context(), tx, id)
+		if err != nil {
+			writeAPIError(w, http.StatusServiceUnavailable, APICodeServiceUnavailable, "Escalation ledger is unavailable")
+			return
+		}
+		if state != "requested" {
+			writeAPIError(w, http.StatusConflict, APICodeConflict, "No pending manual escalation request")
+			return
+		}
 	}
 	if nextStatus != "" && !incidentStatusTransitionAllowed(currentStatus, nextStatus) {
 		writeAPIError(w, http.StatusConflict, APICodeConflict, "Incident status transition is not allowed")
@@ -620,6 +656,13 @@ func (h *Handler) ownerIncidentAction(w http.ResponseWriter, r *http.Request, id
 		var assignmentPayload map[string]any
 		auditActionType, assignmentPayload = ownerIncidentAssignmentEvent(input.Action, input.AnalystID, input.Tier)
 		for key, value := range assignmentPayload {
+			payloadFields[key] = value
+		}
+	}
+	if input.Action == "request_escalation" || input.Action == "clear_escalation" {
+		var escalationPayload map[string]any
+		auditActionType, escalationPayload = ownerIncidentEscalationEvent(input.Action, input.Tier)
+		for key, value := range escalationPayload {
 			payloadFields[key] = value
 		}
 	}
