@@ -28,8 +28,8 @@ func TestSOCOperationContract(t *testing.T) {
 
 func TestSOCRuntimeReadinessOpenAPIHasNoCaseOrSLAClaims(t *testing.T) {
 	op := operation(Route{
-		Path: "/api/owner/soc/readiness",
-		InventoryAuth: "owner_session",
+		Path:            "/api/owner/soc/readiness",
+		InventoryAuth:   "owner_session",
 		InventorySource: "route_inventory.go",
 	}, "get")
 	if len(op["parameters"].([]any)) != 0 {
