@@ -44,6 +44,10 @@ func TestOwnerSOCTriagePageRejectsAnonymousAccess(t *testing.T) {
 		!strings.Contains(rec.Body.String(), "Manual owner reviews are not analyst responses") {
 		t.Fatal("owner view must preserve non-verified assignment, review and SLA semantics")
 	}
+	if !strings.Contains(rec.Body.String(), "Open handoff JSON") ||
+		!strings.Contains(rec.Body.String(), "?handoff=1") {
+		t.Fatal("owner view must link to the private, read-only handoff endpoint")
+	}
 	if strings.Contains(rec.Body.String(), "innerHTML") ||
 		strings.Contains(rec.Body.String(), "eval(") {
 		t.Fatal("owner SOC UI must not execute untrusted case content")

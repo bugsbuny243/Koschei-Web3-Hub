@@ -66,7 +66,15 @@ function render(data){
    var id=typeof inc.id==="string"?inc.id:"";
    if(/^[0-9a-fA-F-]{36}$/.test(id)){link.href="/api/owner/incidents/"+encodeURIComponent(id);}
    else {link.removeAttribute("href");}
-   var td=document.createElement("td");td.appendChild(link);td.appendChild(text("small",label(inc.title)));row.appendChild(td);
+   var td=document.createElement("td");td.appendChild(link);td.appendChild(text("small",label(inc.title)));
+   if(/^[0-9a-fA-F-]{36}$/.test(id)){
+     var handoff=document.createElement("a");
+     handoff.textContent="Open handoff JSON";
+     handoff.href="/api/owner/incidents/"+encodeURIComponent(id)+"?handoff=1";
+     td.appendChild(text("small","Audit snapshot · not evidence verification"));
+     td.appendChild(handoff);
+   }
+   row.appendChild(td);
    cell(row,label(inc.severity),label(inc.status));
    cell(row,duration(item.age_seconds),duration(item.since_last_update_seconds)+" since last update");
    var a=item.analyst_assignment;

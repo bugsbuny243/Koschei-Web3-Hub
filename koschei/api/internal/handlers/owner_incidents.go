@@ -317,6 +317,10 @@ func (h *Handler) OwnerIncidentItem(w http.ResponseWriter, r *http.Request) {
 	}
 	switch r.Method {
 	case http.MethodGet:
+		if r.URL.Query().Get("handoff") == "1" {
+			h.ownerIncidentHandoff(w, r, id)
+			return
+		}
 		h.ownerIncidentGet(w, r, id)
 	case http.MethodPost:
 		h.ownerIncidentAction(w, r, id)
