@@ -17,7 +17,7 @@ type ownerIncidentTriageItem struct {
 	TimeToResolutionSeconds *int64                   `json:"time_to_resolution_seconds,omitempty"`
 	Active                  bool                     `json:"active"`
 	AnalystAssignment       *ownerIncidentAssignment `json:"analyst_assignment,omitempty"`
-	Escalation             *ownerIncidentEscalation `json:"escalation,omitempty"`
+	Escalation              *ownerIncidentEscalation `json:"escalation,omitempty"`
 }
 
 func incidentElapsedSeconds(start, end time.Time) int64 {
