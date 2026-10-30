@@ -90,6 +90,7 @@ func TestSOCIncidentOwnerAuthorizationPostgres17(t *testing.T) {
 	for _, operation := range []struct{ method, path, payload string }{
 		{http.MethodGet, "/api/owner/incidents?triage=1&limit=5", ""},
 		{http.MethodGet, postURL, ""},
+		{http.MethodGet, postURL + "?handoff=2", ""},
 		{http.MethodPost, postURL, `{"action":"assign_analyst","analyst_id":"soc-attacker","tier":"L3"}`},
 		{http.MethodPost, postURL, `{"action":"record_owner_review","summary":"Forged owner review content"}`},
 		{http.MethodPost, postURL, `{"action":"request_escalation","tier":"L3","summary":"Forged escalation request"}`},
@@ -121,6 +122,10 @@ func TestSOCIncidentOwnerAuthorizationPostgres17(t *testing.T) {
 		t.Fatalf("unauthorized requests wrote %d case audit events", count)
 	}
 	const ownerSecret = "soc-http-owner-test-secret"
+	bundle := request(http.MethodGet, postURL+"?handoff=2", "", ownerSecret, nil)
+	if bundle.Code != http.StatusOK || !strings.Contains(bundle.Body.String(), `"schema_version":"koschei.soc-incident-handoff.v2"`) || !strings.Contains(bundle.Body.String(), `"events":[]`) {
+		t.Fatalf("authenticated v2 handoff failed: %d %s", bundle.Code, bundle.Body.String())
+	}
 	for _, payload := range []string{
 		`{"action":"assign_analyst","analyst_id":"soc-verified-owner","tier":"L1"}`,
 		`{"action":"request_escalation","tier":"L2","summary":"Owner requests senior review"}`,

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
@@ -31,6 +32,7 @@ type ownerIncidentHandoffContent struct {
 	SchemaVersion string                       `json:"schema_version"`
 	Incident      ownerIncidentRecord          `json:"incident"`
 	Actions       []ownerIncidentHandoffAction `json:"actions"`
+	Operations    *socHandoffOperations        `json:"operations,omitempty"`
 }
 
 func marshalOwnerIncidentHandoff(content ownerIncidentHandoffContent) ([]byte, string, error) {
@@ -80,8 +82,13 @@ func (h *Handler) ownerIncidentHandoff(w http.ResponseWriter, r *http.Request, i
 		writeAPIError(w, http.StatusServiceUnavailable, APICodeServiceUnavailable, "Incident evidence handoff store is unavailable")
 		return
 	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	r = r.WithContext(ctx)
+	w.Header().Set("Cache-Control", "no-store")
+	v2 := r.URL.Query().Get("handoff") == "2"
 	db := h.DBRead
-	if db == nil {
+	if db == nil || v2 {
 		db = h.DB
 	}
 	tx, err := db.BeginTx(r.Context(), &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
@@ -147,6 +154,18 @@ func (h *Handler) ownerIncidentHandoff(w http.ResponseWriter, r *http.Request, i
 	content := ownerIncidentHandoffContent{
 		SchemaVersion: ownerIncidentHandoffSchema, Incident: incident, Actions: actions,
 	}
+	if v2 {
+		content.SchemaVersion = ownerIncidentHandoffSchemaV2
+		content.Operations, err = readSOCHandoff(r.Context(), tx, id, time.Now().UTC())
+		if err != nil {
+			code, apiCode := http.StatusServiceUnavailable, APICodeServiceUnavailable
+			if errors.Is(err, errSOCHandoffLimit) {
+				code, apiCode = http.StatusConflict, APICodeConflict
+			}
+			writeAPIError(w, code, apiCode, "SOC handoff is unavailable, inconsistent or exceeds bounded export limits")
+			return
+		}
+	}
 	_, digest, err := marshalOwnerIncidentHandoff(content)
 	if err != nil {
 		writeAPIError(w, http.StatusServiceUnavailable, APICodeServiceUnavailable, "Incident handoff cannot be serialized")
@@ -158,13 +177,17 @@ func (h *Handler) ownerIncidentHandoff(w http.ResponseWriter, r *http.Request, i
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
+	hashContract := fmt.Sprintf("SHA-256 of compact encoding/json marshaled content; max %d actions; not a signature or evidence verification", ownerIncidentHandoffActionLimit)
+	if v2 {
+		hashContract = "SHA-256 of compact encoding/json marshaled content; max 500 incident actions and 500 SOC events; not a signature or evidence verification"
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":                    true,
-		"schema_version":        ownerIncidentHandoffSchema,
+		"schema_version":        content.SchemaVersion,
 		"generated_at":          time.Now().UTC(),
 		"content":               content,
 		"content_sha256":        digest,
-		"content_hash_contract": fmt.Sprintf("SHA-256 of compact encoding/json marshaled content; max %d actions; not a signature or evidence verification", ownerIncidentHandoffActionLimit),
+		"content_hash_contract": hashContract,
 		"evidence_validation":   "not_performed_references_only",
 		"actor_verification":    "not_performed_owner_operator_labels_only",
 		"decision_boundary":     ownerIncidentDecisionBoundary,
