@@ -127,6 +127,9 @@ func (g *ownerValidatorTelemetryGate) ServeHTTP(w http.ResponseWriter, r *http.R
 		writeOwnerValidatorTelemetryError(w, "validator_probe_cooldown", http.StatusTooManyRequests)
 		return
 	}
+	// A past success must not be reused after its ten-minute freshness window,
+	// including when the next attempt fails.
+	g.cached = nil
 	// Reserve one request slot before releasing the mutex. Concurrent refreshes
 	// never multiply external RPC requests, including on provider failure.
 	g.nextAllowed = now.Add(ownerValidatorFailureTTL)
