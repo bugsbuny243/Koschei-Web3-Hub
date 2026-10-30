@@ -136,13 +136,13 @@ func TestUnifiedInvestigationProjectsCreatorFieldsFromCanonicalActorResult(t *te
 func TestLegacyFinalAuthorityVisibleInSharedReportWithoutChangingCanonicalVerdict(t *testing.T) {
 	core := holderIntelligenceCoreResult{
 		Request: services.SecurityRadarRequest{
-			Target: "MintFinalBoundary111111111111111111111111111",
+			Target:  "MintFinalBoundary111111111111111111111111111",
 			Network: "solana-mainnet", Mode: "stored_only_projection",
 		},
 		Bundle: services.SecurityRadarBundle{
 			PumpSybilRadar: services.SecurityRadarVerdict{
 				ModuleID: services.ModulePumpSybilRadar,
-				Grade: "A", RiskIndex: 90, RiskLevel: "high",
+				Grade:    "A", RiskIndex: 90, RiskLevel: "high",
 				Signed: true, Signature: "untrusted-legacy-signature",
 				Signals: map[string]any{"real_onchain_evidence": true},
 			},
@@ -155,7 +155,7 @@ func TestLegacyFinalAuthorityVisibleInSharedReportWithoutChangingCanonicalVerdic
 			}},
 		},
 		SourceContext: map[string]any{},
-		Cluster: services.HolderClusterAnalysis{Findings: []string{}},
+		Cluster:       services.HolderClusterAnalysis{Findings: []string{}},
 	}
 	assembly := (&Handler{}).assembleUnifiedInvestigationReport(context.Background(), core)
 	boundary, ok := assembly.Report["final_authority_boundary"].(map[string]any)
