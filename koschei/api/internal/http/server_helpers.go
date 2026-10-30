@@ -42,6 +42,8 @@ var databaseOptionalAPIPaths = func() map[string]struct{} {
 		"/api/owner/radar/investigate",
 		"/api/owner/radar/global/records",
 		"/api/owner/radar/global/events",
+		// Owner-authenticated live RPC observation; no application persistence.
+		"/api/owner/radar/solana/validators",
 		"/api/owner/web3/shield/preflight",
 		"/api/owner/web3/transaction-guard",
 		"/api/owner/web3/transaction-guard/state-recheck",
