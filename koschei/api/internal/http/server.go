@@ -96,6 +96,12 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	registerCoreRoutes(mux, h, planAccess)
 	registerAccountRoutes(mux, h, planTierAccess)
 	registerOwnerRoutes(mux, h, staticDir)
+	validatorGate := newOwnerValidatorTelemetryGate(
+		strings.TrimSpace(os.Getenv("KOSCHEI_OWNER_SOLANA_VALIDATOR_PROBE_ENABLED")) == "1",
+		os.Getenv("SOLANA_RPC_URL"), nil,
+	)
+	mux.HandleFunc("/api/owner/radar/solana/validators", ownerOnly(h, method(http.MethodGet, validatorGate.ServeHTTP)))
+	mux.HandleFunc("/owner/solana-validators", ownerOnly(h, method(http.MethodGet, ownerSolanaValidatorPage)))
 	registerGlobalCampaignOwnerRoutes(mux, h, staticDir)
 	registerSOCOperationsRoutes(mux, h, staticDir)
 	registerCryptoBriefRoutes(mux, h, staticDir)
