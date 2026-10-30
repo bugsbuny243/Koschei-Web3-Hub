@@ -6,7 +6,26 @@ import (
 	"koschei/api/internal/services"
 )
 
-func TestCustomerInvestigationStatusRequiresSignedLiveVerdict(t *testing.T) {
+func TestCustomerInvestigationStatusRequiresCryptographicallyVerifiedLiveVerdict(t *testing.T) {
+	configureHandlerVerdictTestSigner(t)
+	valid := services.FinalizeUnifiedRadarVerdictContractForNetwork("MintReady", "solana-mainnet", services.UnifiedRadarVerdict{
+		RulesetVersion: services.UnifiedRadarRulesetVersion,
+		ActorRuleset: services.ActorDefenseRulesetVersion,
+		TriggeredRules: []services.ActorDefenseRuleHit{{
+			RuleID: services.ActorRuleCompoundCreatorReuse,
+			Tier: "compounding", EvidenceStatus: "verified", Summary: "verified actor evidence",
+		}},
+	})
+	if !valid.Signed || valid.Signature == "" {
+		t.Fatalf("test signed-final fixture unavailable: %#v", valid)
+	}
+	tampered := valid
+	tampered.TriggeredRules = append([]services.ActorDefenseRuleHit{}, valid.TriggeredRules...)
+	tampered.TriggeredRules[0].Summary = "mutated after signing"
+	forged := valid
+	forged.Signature = "fake-signature"
+	wrongTarget := valid
+	wrongTarget.Target = "DifferentMint"
 	tests := []struct {
 		name  string
 		final services.UnifiedRadarVerdict
@@ -14,15 +33,24 @@ func TestCustomerInvestigationStatusRequiresSignedLiveVerdict(t *testing.T) {
 		want  string
 	}{
 		{name: "unsigned live evidence remains pending", final: services.UnifiedRadarVerdict{Grade: "-", Signed: false}, live: true, want: "evidence_pending"},
-		{name: "signed result without live evidence remains pending", final: services.UnifiedRadarVerdict{Grade: "B", Signed: true}, live: false, want: "evidence_pending"},
-		{name: "signed live verdict is ready", final: services.UnifiedRadarVerdict{Grade: "B", Signed: true}, live: true, want: "ready"},
+		{name: "signed flag without signature is not proof", final: services.UnifiedRadarVerdict{Grade: "B", Signed: true}, live: true, want: "evidence_pending"},
+		{name: "signed result without live evidence remains pending", final: valid, live: false, want: "evidence_pending"},
+		{name: "cryptographically valid live verdict is ready", final: valid, live: true, want: "ready"},
+		{name: "altered evidence binding is rejected", final: tampered, live: true, want: "evidence_pending"},
+		{name: "forged signature is rejected", final: forged, live: true, want: "evidence_pending"},
+		{name: "changed target cannot reuse signature", final: wrongTarget, live: true, want: "evidence_pending"},
 	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			if got := customerInvestigationStatus(test.final, test.live); got != test.want {
-				t.Fatalf("status=%q want=%q", got, test.want)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := customerInvestigationStatus(tc.final, tc.live); got != tc.want {
+				t.Fatalf("status=%q want=%q", got, tc.want)
 			}
 		})
+	}
+	t.Setenv("KOSCHEI_VERDICT_SIGNING_KEY_ID", "")
+	t.Setenv("KOSCHEI_VERDICT_SIGNING_PRIVATE_KEY", "")
+	if got := customerInvestigationStatus(valid, true); got != "evidence_pending" {
+		t.Fatalf("missing configured signer must withhold ready status, got %q", got)
 	}
 }
 
