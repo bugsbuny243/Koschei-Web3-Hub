@@ -115,15 +115,15 @@ func TestOwnerSOCLinksScopedCustomerSignedVerdictPostgres(t *testing.T) {
 		_ = json.Unmarshal(w.Body.Bytes(), &parsed)
 		return w, parsed.Incident.ID
 	}
-	for name, networkOverride, targetOverride, evidenceRef := range map[string][3]string{
+	for name, tc := range map[string][3]string{
 		"wrong network": {"solana-devnet", target, ref},
 		"wrong target": {network, "OtherMint", ref},
-		"tampered signature": {network, target, ref[:len(ref)-1] + "A"},
+		"tampered signature": {network, target, ref[:len(ref)-1] + alternateSignatureSuffix(final.Signature)},
 		"bare row ID": {network, target, recordID},
 		"malformed ref": {network, target, "unified-verdict:not-a-uuid:invalid"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			w, _ := postCreate(networkOverride, targetOverride, evidenceRef)
+			w, _ := postCreate(tc[0], tc[1], tc[2])
 			if w.Code != http.StatusConflict {
 				t.Fatalf("%s accepted invalid SOC evidence ref: %d %s", name, w.Code, w.Body.String())
 			}
@@ -154,11 +154,18 @@ func TestOwnerSOCLinksScopedCustomerSignedVerdictPostgres(t *testing.T) {
 
 	// A later row change invalidates the original signature reference. SOC
 	// must never silently relink to a mutable fingerprint-only history row.
-	if _, err := db.Exec("UPDATE security_unified_radar_verdicts SET signature=$2 WHERE id=$1::uuid", recordID, final.Signature[:len(final.Signature)-1]+"B"); err != nil {
+	if _, err := db.Exec("UPDATE security_unified_radar_verdicts SET signature=$2 WHERE id=$1::uuid", recordID, final.Signature[:len(final.Signature)-1]+alternateSignatureSuffix(final.Signature)); err != nil {
 		t.Fatal(err)
 	}
 	changed, _ := postCreate(network, target, ref)
 	if changed.Code != http.StatusConflict {
 		t.Fatalf("rotated signed history row silently reused old receipt: %d %s", changed.Code, changed.Body.String())
 	}
+}
+
+func alternateSignatureSuffix(signature string) string {
+	if strings.HasSuffix(signature, "A") {
+		return "B"
+	}
+	return "A"
 }
