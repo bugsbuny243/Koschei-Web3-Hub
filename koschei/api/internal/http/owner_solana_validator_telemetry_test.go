@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -192,11 +193,12 @@ func TestRegisteredOwnerValidatorProbeCallsRealReadOnlyRPCAdapter(t *testing.T) 
 	t.Setenv("OWNER_SECRET", "validator-live-rpc-fixture")
 	t.Setenv("OWNER_WALLET", "")
 	t.Setenv("KOSCHEI_OWNER_SOLANA_VALIDATOR_PROBE_ENABLED", "1")
-	calls := 0
+	var calls atomic.Int32
 	rpc := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		calls++
+		calls.Add(1)
 		var request struct {
 			Method string `json:"method"`
+			ID any `json:"id"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 			t.Error(err)
@@ -209,7 +211,7 @@ func TestRegisteredOwnerValidatorProbeCallsRealReadOnlyRPCAdapter(t *testing.T) 
 			return
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"jsonrpc":"2.0", "id":1,
+			"jsonrpc":"2.0", "id":request.ID,
 			"result":map[string]any{
 				"current":[]any{map[string]any{
 					"votePubkey":"Vote111111111111111111111111111111111111111",
@@ -238,12 +240,12 @@ func TestRegisteredOwnerValidatorProbeCallsRealReadOnlyRPCAdapter(t *testing.T) 
 	if err := json.Unmarshal(rec.Body.Bytes(), &output); err != nil {
 		t.Fatal(err)
 	}
-	if !output.OK || calls != 1 ||
+	if !output.OK || calls.Load() != 1 ||
 		output.Telemetry.CurrentCount != 1 ||
 		output.Telemetry.Sampled != 1 ||
 		output.Telemetry.EvidenceStatus != "observed" ||
 		output.Telemetry.SafetyVerdict != "not_evaluated" ||
 		output.Telemetry.Rows[0].EvidenceID == "" {
-		t.Fatalf("unexpected registered API observation %#v, RPC calls=%d", output, calls)
+		t.Fatalf("unexpected registered API observation %#v, RPC calls=%d", output, calls.Load())
 	}
 }
