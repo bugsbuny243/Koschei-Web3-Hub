@@ -42,3 +42,24 @@ func customerCanonicalMatchingReceipt(
 	}
 	return services.UnifiedRadarVerdictHistoryRecord{}, false
 }
+
+ // customerCanonicalReceiptGate is the billing readiness contract for the
+ // customer manual radar. Signed evidence without a durable exact-match receipt
+ // is useful for investigation but never counts as a finalized paid output.
+func customerCanonicalReceiptGate(
+	final services.UnifiedRadarVerdict,
+	hasLiveEvidence bool,
+	persistence string,
+	history []services.UnifiedRadarVerdictHistoryRecord,
+	network, target string,
+) (string, services.UnifiedRadarVerdictHistoryRecord, bool) {
+	status := customerInvestigationStatus(final, hasLiveEvidence)
+	if status != "ready" {
+		return status, services.UnifiedRadarVerdictHistoryRecord{}, false
+	}
+	record, matched := customerCanonicalMatchingReceipt(final, history, network, target)
+	if persistence != "persisted" || !matched {
+		return "persistence_pending", services.UnifiedRadarVerdictHistoryRecord{}, false
+	}
+	return "ready", record, true
+}
