@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"strings"
 )
 
@@ -42,6 +43,23 @@ func securityHeaders(next http.Handler) http.Handler {
 // /.well-known is deliberately not treated as a blanket dotfile: standards such
 // as ACME and security.txt may legitimately use that namespace.
 func sensitiveStaticProbePath(rawPath string) bool {
+	// These scripts are kept as source/test fixtures or deprecated UI building
+	// blocks, but none are loaded by the canonical public pages. They must not
+	// become a shadow HTTP API simply because public/ uses a FileServer.
+	// Use path.Clean because the static router normalizes duplicate separators.
+	switch path.Clean("/" + strings.ReplaceAll(strings.ToLower(rawPath), "\\", "/")) {
+	case "/js/koschei-modern.js",
+		"/js/customer-investigation-ux-v2.js",
+		"/js/customer-transaction-preflight-v1.js",
+		"/js/evm-authority-desk.js",
+		"/js/lp-control-evidence-card.js",
+		"/js/premium-evidence-matrix.js",
+		"/js/public-scan-request-guard.js",
+		"/js/unified-live-evidence-card.js",
+		"/js/verdict-card-evidence-refs.js",
+		"/js/verdict-card-market-context.js":
+		return true
+	}
 	for _, segment := range strings.Split(strings.ReplaceAll(strings.ToLower(rawPath), "\\", "/"), "/") {
 		segment = strings.TrimSpace(segment)
 		if segment == "" || segment == "." || segment == ".." || segment == ".well-known" {

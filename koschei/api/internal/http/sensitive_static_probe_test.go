@@ -39,6 +39,19 @@ func TestSensitiveStaticProbePathRejectsSecretRepositoryAndTestOnlyPaths(t *test
 		"/js/__fixtures__/cfpk-live-scan.json",
 		"/js/__fixtures__/historical-scan.json",
 		"/validation-key.txt",
+		"/js/koschei-modern.js",
+		"/js/customer-investigation-ux-v2.js",
+		"/js/customer-transaction-preflight-v1.js",
+		"/js/evm-authority-desk.js",
+		"/js/lp-control-evidence-card.js",
+		"/js/premium-evidence-matrix.js",
+		"/js/public-scan-request-guard.js",
+		"/js/unified-live-evidence-card.js",
+		"/js/verdict-card-evidence-refs.js",
+		"/js/verdict-card-market-context.js",
+		"//js//lp-control-evidence-card.js",
+		"/JS/EVM-AUTHORITY-DESK.JS",
+		"/js\\verdict-card-market-context.js",
 	} {
 		if !sensitiveStaticProbePath(probe) {
 			t.Errorf("probe %q was not rejected", probe)
@@ -59,6 +72,10 @@ func TestSensitiveStaticProbePathPreservesLegitimatePublicSurface(t *testing.T) 
 		"/full-scan-contract-v1.json",
 		"/security-ecosystem.json",
 		"/sitemap.xml",
+		"/js/koschei-auth.js",
+		"/js/customer-universal-address-scan-v1.js",
+		"/js/public-solana-scan.js",
+		"/sdk/koschei-shield.js",
 	} {
 		if sensitiveStaticProbePath(path) {
 			t.Errorf("legitimate public path %q was rejected", path)
@@ -84,6 +101,9 @@ func TestSecurityHeadersReturns404BeforeSensitiveProbeCanReachStaticFallback(t *
 		"https://tradepigloball.co/js/__tests__/customer-scan-entry.test.cjs",
 		"https://tradepigloball.co/js/__fixtures__/historical-scan.json",
 		"https://tradepigloball.co/validation-key.txt",
+		"https://tradepigloball.co/js/koschei-modern.js",
+		"https://tradepigloball.co/js/evm-authority-desk.js",
+		"https://tradepigloball.co/js/unified-live-evidence-card.js",
 	} {
 		called = false
 		recorder := httptest.NewRecorder()
