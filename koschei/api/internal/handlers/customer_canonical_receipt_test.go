@@ -10,10 +10,10 @@ func TestCustomerCanonicalReceiptGateRequiresExactDurableSignedFinal(t *testing.
 	configureHandlerVerdictTestSigner(t)
 	final := services.FinalizeUnifiedRadarVerdictContractForNetwork("MintReceipt", "solana-mainnet", services.UnifiedRadarVerdict{
 		RulesetVersion: services.UnifiedRadarRulesetVersion,
-		ActorRuleset: services.ActorDefenseRulesetVersion,
+		ActorRuleset:   services.ActorDefenseRulesetVersion,
 		TriggeredRules: []services.ActorDefenseRuleHit{{
 			RuleID: services.ActorRuleCompoundCreatorReuse,
-			Tier: "compounding", EvidenceStatus: "verified",
+			Tier:   "compounding", EvidenceStatus: "verified",
 			Summary: "actual verified creator evidence",
 		}},
 	})
@@ -21,7 +21,7 @@ func TestCustomerCanonicalReceiptGateRequiresExactDurableSignedFinal(t *testing.
 		t.Fatalf("test signer unavailable: %#v", final)
 	}
 	record := services.UnifiedRadarVerdictHistoryRecord{
-		ID: "saved-unified-verdict-1",
+		ID:      "saved-unified-verdict-1",
 		Network: final.Network, TargetKind: "token", TargetID: final.Target,
 		Grade: final.Grade, Verdict: final.Verdict, RulesetVersion: final.RulesetVersion,
 		ActorRulesetVersion: final.ActorRuleset, Digest: final.Digest, Signed: final.Signed,
@@ -52,7 +52,11 @@ func TestCustomerCanonicalReceiptGateRequiresExactDurableSignedFinal(t *testing.
 	test("receipt without ID", final, true, "persisted", []services.UnifiedRadarVerdictHistoryRecord{func() services.UnifiedRadarVerdictHistoryRecord { r := record; r.ID = ""; return r }()}, final.Network, final.Target, "persistence_pending", false)
 	test("receipt forged signed bit", final, true, "persisted", []services.UnifiedRadarVerdictHistoryRecord{func() services.UnifiedRadarVerdictHistoryRecord { r := record; r.Signed = false; return r }()}, final.Network, final.Target, "persistence_pending", false)
 	test("receipt key substitution", final, true, "persisted", []services.UnifiedRadarVerdictHistoryRecord{func() services.UnifiedRadarVerdictHistoryRecord { r := record; r.KeyID = "other"; return r }()}, final.Network, final.Target, "persistence_pending", false)
-	test("receipt payload hash mismatch", final, true, "persisted", []services.UnifiedRadarVerdictHistoryRecord{func() services.UnifiedRadarVerdictHistoryRecord { r := record; r.PayloadHash = "sha256:tampered"; return r }()}, final.Network, final.Target, "persistence_pending", false)
+	test("receipt payload hash mismatch", final, true, "persisted", []services.UnifiedRadarVerdictHistoryRecord{func() services.UnifiedRadarVerdictHistoryRecord {
+		r := record
+		r.PayloadHash = "sha256:tampered"
+		return r
+	}()}, final.Network, final.Target, "persistence_pending", false)
 	test("receipt signature mismatch", final, true, "persisted", []services.UnifiedRadarVerdictHistoryRecord{func() services.UnifiedRadarVerdictHistoryRecord { r := record; r.Signature = "forged"; return r }()}, final.Network, final.Target, "persistence_pending", false)
 	test("wrong request network", final, true, "persisted", []services.UnifiedRadarVerdictHistoryRecord{record}, "solana-devnet", final.Target, "persistence_pending", false)
 	test("wrong request target", final, true, "persisted", []services.UnifiedRadarVerdictHistoryRecord{record}, final.Network, "OtherMint", "persistence_pending", false)
