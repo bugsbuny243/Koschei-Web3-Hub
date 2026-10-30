@@ -82,13 +82,13 @@ func TestLegacyFinalCannotBorrowAnotherArmsEvidenceOrFakeFinalSignature(t *testi
 	bundle := SecurityRadarBundle{
 		PumpSybilRadar: SecurityRadarVerdict{
 			ModuleID: ModulePumpSybilRadar,
-			Grade: "B", RiskIndex: 46, RiskLevel: "medium",
+			Grade:    "B", RiskIndex: 46, RiskLevel: "medium",
 			Signed: true, Signature: "forged-legacy-pump",
 			Signals: map[string]any{"real_onchain_evidence": true},
 		},
 		RaydiumPoolGuardian: SecurityRadarVerdict{
 			ModuleID: ModuleRaydiumPoolGuardian,
-			Grade: "A", RiskIndex: 99, RiskLevel: "high",
+			Grade:    "A", RiskIndex: 99, RiskLevel: "high",
 			Signed: true, Signature: "forged-legacy-raydium",
 			Signals: map[string]any{"real_onchain_evidence": false},
 		},
