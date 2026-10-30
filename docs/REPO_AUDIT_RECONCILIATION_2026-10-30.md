@@ -84,3 +84,13 @@ Observed gap: `/api/security/radar/check` saved the ARVIS evidence-arm bundle bu
 - Regression tests cover exact positive receipt, missing database, compact index, missing/forged signature, tampered evidence, target/network mismatch, wrong signer key and receipt fields.
 
 This work closes a concrete authenticated customer-to-history gap; live SOC production sink acceptance and end-to-end Railway invocation remain independent requirements.
+
+## 2026-10-30 SOC owner case evidence references for persisted signed customer finals
+
+Prior owner SOC incident creation/linking resolved legacy radar events and legacy `security_radar_verdicts` but **not** the unified signed customer verdict table. Consequently the persisted customer `final_verdict_receipt` (PR #1492) had no resolvable path into an explicit owner incident/case timeline.
+
+- `final_verdict_receipt.soc_evidence_ref` now provides the **namespaced** `unified-verdict:<uuid>:<ed25519-signature>` reference only after the exact customer final passed the verified signer/DB receipt gate.
+- Owner-only `POST /api/owner/incidents` with an evidence ref and `POST /api/owner/incidents/{id}` with `action=link_evidence` resolve the namespaced reference by matching **persisted row ID + exact recorded signature + incident target and network**, requiring recorded signed Ed25519 metadata and payload hash. The existing owner action audit records source classification. Invalid/mismatched/stale signatures are rejected; no other evidence resolution paths change.
+- Reference resolution is explicitly **recorded-signature matching**, *not independent cryptographic re-verification of historical verdicts*. Current unified history may update a fingerprint row on later scans: a changed recorded signature makes an older reference fail closed. An immutable append-only signature-history ledger remains a separate requirement for long-term retention and true cryptographic SOC re-verification.
+- The customer endpoint does **not** automatically open SOC cases, determine operator severity, assign analysts, or trigger enforcement. Only owner action creates the case or links the evidence. The existing /owner/soc queue and case views read those persisted incident and audit rows; no new public route.
+- PostgreSQL acceptance uses a private disposable schema with migrations 058/120/123/137 to exercise positive case creation, explicit link action, target/network/signature mismatch, and changed stored signature behavior. Railway runtime and staffed SOC operation remain unproven.
