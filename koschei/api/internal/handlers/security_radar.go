@@ -158,8 +158,11 @@ func (h *Handler) SecurityRadarCheck(w http.ResponseWriter, r *http.Request) {
 			ctx, assembly.DB, input.Network, "token", target, customerFinal, assembly.Behavior,
 		)
 		persistence = historyStatus
-		if stored, matched := customerCanonicalMatchingReceipt(customerFinal, history, input.Network, target); historyStatus != "persisted" || !matched {
-			status = "persistence_pending"
+		matchedStatus, stored, receiptReady := customerCanonicalReceiptGate(
+			customerFinal, hasLiveEvidence, historyStatus, history, input.Network, target,
+		)
+		status = matchedStatus
+		if !receiptReady {
 			services.WriteSecurityAuditEvent(ctx, h.DB, securityAuditFromRequest(
 				r, "radar_check_final_receipt_pending", "customer", "warning",
 				map[string]any{"network": input.Network, "target": target, "persistence": persistence},
