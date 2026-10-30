@@ -424,6 +424,7 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 		"target":       target, "network": network, "generated_at": now.Format(time.RFC3339),
 		"analysis_scope": "token_plus_actor_plus_market_behavior",
 		"final_verdict":  unifiedVerdict, "threat_anticipation": threat,
+		"final_authority_boundary": legacyARVISFinalAuthorityBoundary(core.Bundle, unifiedVerdict),
 		"investigation_coverage": coverage, "holder_distribution": core.Distribution,
 		"holder_intelligence": core.Intelligence, "holder_cluster": core.Cluster,
 		"holder_concentration_context": holderConcentrationContext,
@@ -601,4 +602,25 @@ func actorDiscoveryStageContext(parent context.Context) (context.Context, contex
 		budget = remaining / 2
 	}
 	return context.WithTimeout(parent, budget)
+}
+
+// legacyARVISFinalAuthorityBoundary is operator-visible metadata in the same
+// technical investigation report served to owner and customer clients. It
+// cannot alter the canonical signed verdict or trigger a second RPC scan.
+func legacyARVISFinalAuthorityBoundary(bundle services.SecurityRadarBundle, canonical services.UnifiedRadarVerdict) map[string]any {
+	legacy := services.EvidenceBackedLegacyFinalFromGatedBundle(bundle)
+	return map[string]any{
+		"schema_version": "koschei.final-authority-boundary.v1",
+		"legacy_engine": "ARVIS arm compatibility",
+		"legacy_authoritative": false,
+		"legacy_grade": legacy.Grade,
+		"legacy_signed": legacy.Signed,
+		"legacy_recommendation": legacy.Recommendation,
+		"legacy_verified_arm_evidence_present": services.SecurityRadarHasLiveEvidence(bundle),
+		"canonical_engine": "EvaluateUnifiedRadarVerdictV140",
+		"canonical_grade": canonical.Grade,
+		"canonical_signed": canonical.Signed,
+		"policy": "legacy_arms_never_grade_or_sign_canonical_final",
+		"decision_mutated": false,
+	}
 }
