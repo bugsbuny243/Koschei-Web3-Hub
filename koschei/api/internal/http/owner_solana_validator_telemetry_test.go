@@ -18,11 +18,11 @@ import (
 func validatorReportFixture(t *testing.T, at time.Time) services.SolanaValidatorTelemetryReport {
 	t.Helper()
 	observation, err := networktarget.NormalizeNetworkTelemetry(networktarget.NetworkTelemetryInput{
-		NetworkID: "solana-mainnet",
-		SubjectKind: "validator",
-		SubjectID: "Vote111",
-		Source: "solana-rpc:getVoteAccounts",
-		ObservedAt: at,
+		NetworkID:      "solana-mainnet",
+		SubjectKind:    "validator",
+		SubjectID:      "Vote111",
+		Source:         "solana-rpc:getVoteAccounts",
+		ObservedAt:     at,
 		EvidenceStatus: "observed",
 	})
 	if err != nil {
@@ -30,18 +30,18 @@ func validatorReportFixture(t *testing.T, at time.Time) services.SolanaValidator
 	}
 	return services.SolanaValidatorTelemetryReport{
 		SchemaVersion: networktarget.NetworkTelemetrySchemaVersion,
-		Network: "solana-mainnet",
-		CurrentCount: 1,
+		Network:       "solana-mainnet",
+		CurrentCount:  1,
 		Validators: []services.SolanaVoteAccountTelemetry{{
 			VotePubkey: "Vote111", NodePubkey: "Node111",
 			ActivatedStake: 100, Commission: 5, LastVote: 123,
 			Observation: observation,
 		}},
 		TotalActivatedStake: 100,
-		Source: "solana-rpc:getVoteAccounts",
-		ObservedAt: at,
-		AnalysisPerformed: true,
-		LiveAvailability: "checked",
+		Source:              "solana-rpc:getVoteAccounts",
+		ObservedAt:          at,
+		AnalysisPerformed:   true,
+		LiveAvailability:    "checked",
 	}
 }
 
@@ -123,21 +123,21 @@ func TestOwnerValidatorTelemetryRejectsInvalidAndNeverCachesStaleSuccess(t *test
 func TestOwnerValidatorTelemetryStrictResponseValidation(t *testing.T) {
 	at := time.Date(2026, 10, 30, 5, 0, 0, 0, time.UTC)
 	base := validatorReportFixture(t, at)
-	for _, tc := range []struct{
-		name string
+	for _, tc := range []struct {
+		name   string
 		mutate func(*services.SolanaValidatorTelemetryReport)
 	}{
-		{"not_checked",func(r *services.SolanaValidatorTelemetryReport){r.LiveAvailability="not_checked"}},
-		{"fabricated_network",func(r *services.SolanaValidatorTelemetryReport){r.Network="ethereum-mainnet"}},
-		{"incomplete_count",func(r *services.SolanaValidatorTelemetryReport){r.CurrentCount=2}},
-		{"missing_source",func(r *services.SolanaValidatorTelemetryReport){r.Source=""}},
-		{"empty_validators",func(r *services.SolanaValidatorTelemetryReport){r.Validators=nil;r.CurrentCount=0}},
+		{"not_checked", func(r *services.SolanaValidatorTelemetryReport) { r.LiveAvailability = "not_checked" }},
+		{"fabricated_network", func(r *services.SolanaValidatorTelemetryReport) { r.Network = "ethereum-mainnet" }},
+		{"incomplete_count", func(r *services.SolanaValidatorTelemetryReport) { r.CurrentCount = 2 }},
+		{"missing_source", func(r *services.SolanaValidatorTelemetryReport) { r.Source = "" }},
+		{"empty_validators", func(r *services.SolanaValidatorTelemetryReport) { r.Validators = nil; r.CurrentCount = 0 }},
 	} {
-		t.Run(tc.name,func(t *testing.T){
-			invalid:=base
+		t.Run(tc.name, func(t *testing.T) {
+			invalid := base
 			tc.mutate(&invalid)
-			if _,err:=projectOwnerValidatorTelemetry(invalid);err==nil{
-				t.Fatalf("%s accepted invalid provider report",tc.name)
+			if _, err := projectOwnerValidatorTelemetry(invalid); err == nil {
+				t.Fatalf("%s accepted invalid provider report", tc.name)
 			}
 		})
 	}
@@ -198,7 +198,7 @@ func TestRegisteredOwnerValidatorProbeCallsRealReadOnlyRPCAdapter(t *testing.T) 
 		calls.Add(1)
 		var request struct {
 			Method string `json:"method"`
-			ID any `json:"id"`
+			ID     any    `json:"id"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 			t.Error(err)
@@ -211,15 +211,15 @@ func TestRegisteredOwnerValidatorProbeCallsRealReadOnlyRPCAdapter(t *testing.T) 
 			return
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"jsonrpc":"2.0", "id":request.ID,
-			"result":map[string]any{
-				"current":[]any{map[string]any{
-					"votePubkey":"Vote111111111111111111111111111111111111111",
-					"nodePubkey":"Node111111111111111111111111111111111111111",
-					"activatedStake":uint64(100), "commission":5,
-					"lastVote":uint64(42), "rootSlot":uint64(40),
+			"jsonrpc": "2.0", "id": request.ID,
+			"result": map[string]any{
+				"current": []any{map[string]any{
+					"votePubkey":     "Vote111111111111111111111111111111111111111",
+					"nodePubkey":     "Node111111111111111111111111111111111111111",
+					"activatedStake": uint64(100), "commission": 5,
+					"lastVote": uint64(42), "rootSlot": uint64(40),
 				}},
-				"delinquent":[]any{},
+				"delinquent": []any{},
 			},
 		})
 	}))
@@ -234,7 +234,7 @@ func TestRegisteredOwnerValidatorProbeCallsRealReadOnlyRPCAdapter(t *testing.T) 
 		t.Fatalf("registered live RPC telemetry status=%d body=%s", rec.Code, rec.Body.String())
 	}
 	var output struct {
-		OK bool `json:"ok"`
+		OK        bool                            `json:"ok"`
 		Telemetry ownerValidatorTelemetryResponse `json:"telemetry"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &output); err != nil {
