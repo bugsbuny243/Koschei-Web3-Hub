@@ -186,3 +186,64 @@ func TestRegisteredOwnerValidatorRoutesAreProtectedAndOptIn(t *testing.T) {
 		t.Fatalf("wrong method accepted: %d", rec.Code)
 	}
 }
+
+func TestRegisteredOwnerValidatorProbeCallsRealReadOnlyRPCAdapter(t *testing.T) {
+	t.Setenv("APP_ENV", "test")
+	t.Setenv("OWNER_SECRET", "validator-live-rpc-fixture")
+	t.Setenv("OWNER_WALLET", "")
+	t.Setenv("KOSCHEI_OWNER_SOLANA_VALIDATOR_PROBE_ENABLED", "1")
+	calls := 0
+	rpc := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		var request struct {
+			Method string `json:"method"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Error(err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		if request.Method != "getVoteAccounts" {
+			t.Errorf("unexpected method %q", request.Method)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"jsonrpc":"2.0", "id":1,
+			"result":map[string]any{
+				"current":[]any{map[string]any{
+					"votePubkey":"Vote111111111111111111111111111111111111111",
+					"nodePubkey":"Node111111111111111111111111111111111111111",
+					"activatedStake":uint64(100), "commission":5,
+					"lastVote":uint64(42), "rootSlot":uint64(40),
+				}},
+				"delinquent":[]any{},
+			},
+		})
+	}))
+	defer rpc.Close()
+	t.Setenv("SOLANA_RPC_URL", rpc.URL)
+	srv := NewServer(nil, "", "", "", t.TempDir())
+	req := httptest.NewRequest(http.MethodGet, "/api/owner/radar/solana/validators", nil)
+	req.Header.Set("x-koschei-secret", "validator-live-rpc-fixture")
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("registered live RPC telemetry status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	var output struct {
+		OK bool `json:"ok"`
+		Telemetry ownerValidatorTelemetryResponse `json:"telemetry"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &output); err != nil {
+		t.Fatal(err)
+	}
+	if !output.OK || calls != 1 ||
+		output.Telemetry.CurrentCount != 1 ||
+		output.Telemetry.Sampled != 1 ||
+		output.Telemetry.EvidenceStatus != "observed" ||
+		output.Telemetry.SafetyVerdict != "not_evaluated" ||
+		output.Telemetry.Rows[0].EvidenceID == "" {
+		t.Fatalf("unexpected registered API observation %#v, RPC calls=%d", output, calls)
+	}
+}
