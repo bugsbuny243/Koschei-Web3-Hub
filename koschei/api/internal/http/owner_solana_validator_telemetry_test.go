@@ -174,7 +174,7 @@ func TestRegisteredOwnerValidatorRoutesAreProtectedAndOptIn(t *testing.T) {
 	pageReq.Header.Set("x-koschei-secret", "owner-validator-fixture")
 	page := httptest.NewRecorder()
 	enabled.ServeHTTP(page, pageReq)
-	if page.Code != http.StatusOK || !strings.Contains(page.Body.String(), "credentials:\\"same-origin\\"") ||
+	if page.Code != http.StatusOK || !strings.Contains(page.Body.String(), `credentials:"same-origin"`) ||
 		!strings.Contains(page.Body.String(), "OBSERVED ≠ VERIFIED") {
 		t.Fatalf("private owner page missing evidence boundary: %d %s", page.Code, page.Body.String())
 	}
