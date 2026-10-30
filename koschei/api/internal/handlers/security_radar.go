@@ -172,6 +172,7 @@ func (h *Handler) SecurityRadarCheck(w http.ResponseWriter, r *http.Request) {
 				"id": stored.ID, "fingerprint": stored.Fingerprint,
 				"signature": stored.Signature, "payload_hash": stored.PayloadHash,
 				"key_id": stored.KeyID, "rule_version": stored.RulesetVersion,
+				"soc_evidence_ref": unifiedSOCVerdictRefPrefix + stored.ID + ":" + stored.Signature,
 			}
 			if err := h.consumePremiumOutput(claims.Sub, claimEmail, "security_radar_check"); err != nil {
 				writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
