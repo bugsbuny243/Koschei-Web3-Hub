@@ -67,10 +67,10 @@ func TestOwnerSOCLinksScopedCustomerSignedVerdictPostgres(t *testing.T) {
 	target, network := "MintSOCReceipt", "solana-mainnet"
 	final := services.FinalizeUnifiedRadarVerdictContractForNetwork(target, network, services.UnifiedRadarVerdict{
 		RulesetVersion: services.UnifiedRadarRulesetVersion,
-		ActorRuleset: services.ActorDefenseRulesetVersion,
+		ActorRuleset:   services.ActorDefenseRulesetVersion,
 		TriggeredRules: []services.ActorDefenseRuleHit{{
 			RuleID: services.ActorRuleCompoundCreatorReuse,
-			Tier: "compounding", EvidenceStatus: "verified", Summary: "creator evidence",
+			Tier:   "compounding", EvidenceStatus: "verified", Summary: "creator evidence",
 		}},
 	})
 	if !final.Signed {
@@ -83,9 +83,9 @@ func TestOwnerSOCLinksScopedCustomerSignedVerdictPostgres(t *testing.T) {
 			signed,signature,signature_algorithm,key_id,payload_hash,fingerprint,digest
 		) VALUES ($1,'token',$2,$3,$4,$5,$6,true,$7,$8,$9,$10,'signed-soc-fixture-1',$11)
 		RETURNING id::text
-	`, network,target,final.Grade,final.Verdict,final.RulesetVersion,
-		final.ActorRuleset,final.Signature,final.SignatureAlgorithm,final.KeyID,
-		final.PayloadHash,final.Digest).Scan(&recordID); err != nil {
+	`, network, target, final.Grade, final.Verdict, final.RulesetVersion,
+		final.ActorRuleset, final.Signature, final.SignatureAlgorithm, final.KeyID,
+		final.PayloadHash, final.Digest).Scan(&recordID); err != nil {
 		t.Fatal(err)
 	}
 	ref := unifiedSOCVerdictRefPrefix + recordID + ":" + final.Signature
@@ -100,7 +100,7 @@ func TestOwnerSOCLinksScopedCustomerSignedVerdictPostgres(t *testing.T) {
 		body, err := json.Marshal(map[string]any{
 			"title": "Manual SOC review", "severity": "medium",
 			"network": network, "target": target,
-			"summary": "Operator explicitly linked a persisted signed customer verdict",
+			"summary":       "Operator explicitly linked a persisted signed customer verdict",
 			"evidence_refs": []string{ref},
 		})
 		if err != nil {
@@ -110,16 +110,18 @@ func TestOwnerSOCLinksScopedCustomerSignedVerdictPostgres(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/api/owner/incidents", strings.NewReader(string(body)))
 		h.OwnerIncidents(w, req)
 		var parsed struct {
-			Incident struct { ID string `json:"id"` } `json:"incident"`
+			Incident struct {
+				ID string `json:"id"`
+			} `json:"incident"`
 		}
 		_ = json.Unmarshal(w.Body.Bytes(), &parsed)
 		return w, parsed.Incident.ID
 	}
 	for name, tc := range map[string][3]string{
-		"wrong network": {"solana-devnet", target, ref},
-		"wrong target": {network, "OtherMint", ref},
+		"wrong network":      {"solana-devnet", target, ref},
+		"wrong target":       {network, "OtherMint", ref},
 		"tampered signature": {network, target, ref[:len(ref)-1] + alternateSignatureSuffix(final.Signature)},
-		"malformed ref": {network, target, "unified-verdict:not-a-uuid:invalid"},
+		"malformed ref":      {network, target, "unified-verdict:not-a-uuid:invalid"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			w, _ := postCreate(tc[0], tc[1], tc[2])
