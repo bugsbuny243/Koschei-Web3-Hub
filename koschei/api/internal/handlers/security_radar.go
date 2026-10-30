@@ -141,15 +141,15 @@ func (h *Handler) SecurityRadarCheck(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = h.saveSecurityRadarBundle(ctx, claims.Sub, "manual_check", assembly.Core.Bundle)
 
+	status := customerInvestigationStatus(assembly.UnifiedVerdict, hasLiveEvidence)
 	charged := false
-	if hasLiveEvidence {
+	if status == "ready" {
 		if err := h.consumePremiumOutput(claims.Sub, claimEmail, "security_radar_check"); err != nil {
 			writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
 			return
 		}
 		charged = true
 	}
-	status := customerInvestigationStatus(assembly.UnifiedVerdict, hasLiveEvidence)
 	h.logTool(claimEmail, "security_radar_check", status)
 	h.trackEvent(claimEmail, "security_radar_check", r.URL.Path)
 	writeJSON(w, http.StatusOK, customerInvestigationEnvelope(assembly, charged))
