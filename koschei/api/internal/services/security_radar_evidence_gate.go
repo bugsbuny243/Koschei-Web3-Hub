@@ -78,9 +78,9 @@ func EvidenceBackedLegacyFinalFromGatedBundle(bundle SecurityRadarBundle) Securi
 	if !SecurityRadarHasLiveEvidence(bundle) {
 		return SecurityRadarFinalVerdict{
 			Grade: "-", RiskIndex: 0, RiskLevel: "unknown",
-			Verdict: SecurityRadarInsufficientEvidenceMessage,
+			Verdict:        SecurityRadarInsufficientEvidenceMessage,
 			Recommendation: "insufficient_evidence",
-			RuleVersion: SecurityRadarRuleVersion, Signed: false, Signature: "",
+			RuleVersion:    SecurityRadarRuleVersion, Signed: false, Signature: "",
 		}
 	}
 	return arvisCompatibilityFinal()
