@@ -425,7 +425,7 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 		"analysis_scope": "token_plus_actor_plus_market_behavior",
 		"final_verdict":  unifiedVerdict, "threat_anticipation": threat,
 		"final_authority_boundary": legacyARVISFinalAuthorityBoundary(core.Bundle, unifiedVerdict),
-		"investigation_coverage": coverage, "holder_distribution": core.Distribution,
+		"investigation_coverage":   coverage, "holder_distribution": core.Distribution,
 		"holder_intelligence": core.Intelligence, "holder_cluster": core.Cluster,
 		"holder_concentration_context": holderConcentrationContext,
 		"funding_cluster_history":      fundingOutcomeMemory,
@@ -610,17 +610,17 @@ func actorDiscoveryStageContext(parent context.Context) (context.Context, contex
 func legacyARVISFinalAuthorityBoundary(bundle services.SecurityRadarBundle, canonical services.UnifiedRadarVerdict) map[string]any {
 	legacy := services.EvidenceBackedLegacyFinalFromGatedBundle(bundle)
 	return map[string]any{
-		"schema_version": "koschei.final-authority-boundary.v1",
-		"legacy_engine": "ARVIS arm compatibility",
-		"legacy_authoritative": false,
-		"legacy_grade": legacy.Grade,
-		"legacy_signed": legacy.Signed,
-		"legacy_recommendation": legacy.Recommendation,
+		"schema_version":                       "koschei.final-authority-boundary.v1",
+		"legacy_engine":                        "ARVIS arm compatibility",
+		"legacy_authoritative":                 false,
+		"legacy_grade":                         legacy.Grade,
+		"legacy_signed":                        legacy.Signed,
+		"legacy_recommendation":                legacy.Recommendation,
 		"legacy_verified_arm_evidence_present": services.SecurityRadarHasLiveEvidence(bundle),
-		"canonical_engine": "EvaluateUnifiedRadarVerdictV140",
-		"canonical_grade": canonical.Grade,
-		"canonical_signed": canonical.Signed,
-		"policy": "legacy_arms_never_grade_or_sign_canonical_final",
-		"decision_mutated": false,
+		"canonical_engine":                     "EvaluateUnifiedRadarVerdictV140",
+		"canonical_grade":                      canonical.Grade,
+		"canonical_signed":                     canonical.Signed,
+		"policy":                               "legacy_arms_never_grade_or_sign_canonical_final",
+		"decision_mutated":                     false,
 	}
 }
