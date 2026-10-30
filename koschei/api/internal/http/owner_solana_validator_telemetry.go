@@ -2,8 +2,8 @@ package http
 
 import (
 	"context"
-	"errors"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"sync"
@@ -35,40 +35,40 @@ type ownerValidatorTelemetryRow struct {
 }
 
 type ownerValidatorTelemetryResponse struct {
-	SchemaVersion    string                       `json:"schema_version"`
-	Network          string                       `json:"network"`
-	Source           string                       `json:"source"`
-	ObservedAt       time.Time                    `json:"observed_at"`
-	EvidenceStatus   string                       `json:"evidence_status"`
-	LiveAvailability string                       `json:"live_availability"`
-	AnalysisPerformed bool                        `json:"analysis_performed"`
-	CurrentCount     int                          `json:"current_count"`
-	DelinquentCount  int                          `json:"delinquent_count"`
-	TotalStake       uint64                       `json:"total_activated_stake"`
-	Sampled          int                          `json:"sampled"`
-	SampleLimit      int                          `json:"sample_limit"`
-	Truncated        bool                         `json:"truncated"`
-	Persisted        bool                         `json:"persisted"`
-	SafetyVerdict    string                       `json:"safety_verdict"`
-	FromCache        bool                         `json:"from_cache"`
-	ProbeAttempts    uint64                       `json:"probe_attempts"`
-	ProbeFailures    uint64                       `json:"probe_failures"`
-	Rows             []ownerValidatorTelemetryRow `json:"observations"`
+	SchemaVersion     string                       `json:"schema_version"`
+	Network           string                       `json:"network"`
+	Source            string                       `json:"source"`
+	ObservedAt        time.Time                    `json:"observed_at"`
+	EvidenceStatus    string                       `json:"evidence_status"`
+	LiveAvailability  string                       `json:"live_availability"`
+	AnalysisPerformed bool                         `json:"analysis_performed"`
+	CurrentCount      int                          `json:"current_count"`
+	DelinquentCount   int                          `json:"delinquent_count"`
+	TotalStake        uint64                       `json:"total_activated_stake"`
+	Sampled           int                          `json:"sampled"`
+	SampleLimit       int                          `json:"sample_limit"`
+	Truncated         bool                         `json:"truncated"`
+	Persisted         bool                         `json:"persisted"`
+	SafetyVerdict     string                       `json:"safety_verdict"`
+	FromCache         bool                         `json:"from_cache"`
+	ProbeAttempts     uint64                       `json:"probe_attempts"`
+	ProbeFailures     uint64                       `json:"probe_failures"`
+	Rows              []ownerValidatorTelemetryRow `json:"observations"`
 }
 
 // This is a deliberate operator-triggered read path. It does not start a
 // background worker, persist evidence, or influence ARVIS customer verdicts.
 // The probe remains disabled unless the operator explicitly enables it.
 type ownerValidatorTelemetryGate struct {
-	mu           sync.Mutex
-	enabled      bool
-	rpcURL       string
-	probe        ownerValidatorProbe
-	now          func() time.Time
-	nextAllowed  time.Time
-	cached       *ownerValidatorTelemetryResponse
-	attempts     uint64
-	failures     uint64
+	mu          sync.Mutex
+	enabled     bool
+	rpcURL      string
+	probe       ownerValidatorProbe
+	now         func() time.Time
+	nextAllowed time.Time
+	cached      *ownerValidatorTelemetryResponse
+	attempts    uint64
+	failures    uint64
 }
 
 func newOwnerValidatorTelemetryGate(enabled bool, rpcURL string, probe ownerValidatorProbe) *ownerValidatorTelemetryGate {
@@ -77,9 +77,9 @@ func newOwnerValidatorTelemetryGate(enabled bool, rpcURL string, probe ownerVali
 	}
 	return &ownerValidatorTelemetryGate{
 		enabled: enabled,
-		rpcURL: strings.TrimSpace(rpcURL),
-		probe: probe,
-		now: func() time.Time { return time.Now().UTC() },
+		rpcURL:  strings.TrimSpace(rpcURL),
+		probe:   probe,
+		now:     func() time.Time { return time.Now().UTC() },
 	}
 }
 
@@ -88,11 +88,11 @@ func writeOwnerValidatorTelemetryError(w http.ResponseWriter, code string, statu
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(map[string]any{
-		"ok": false,
-		"code": code,
+		"ok":                 false,
+		"code":               code,
 		"analysis_performed": false,
-		"evidence_status": "unknown",
-		"safety_verdict": "not_evaluated",
+		"evidence_status":    "unknown",
+		"safety_verdict":     "not_evaluated",
 	})
 }
 
@@ -164,7 +164,7 @@ func (g *ownerValidatorTelemetryGate) writeResponse(w http.ResponseWriter, resul
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	_ = json.NewEncoder(w).Encode(map[string]any{
-		"ok": true,
+		"ok":        true,
 		"telemetry": result,
 	})
 }
@@ -194,31 +194,31 @@ func projectOwnerValidatorTelemetry(report services.SolanaValidatorTelemetryRepo
 		}
 		val := sampled.Validators[i]
 		rows = append(rows, ownerValidatorTelemetryRow{
-			VotePubkey: val.VotePubkey,
-			NodePubkey: val.NodePubkey,
-			Delinquent: val.Delinquent,
+			VotePubkey:    val.VotePubkey,
+			NodePubkey:    val.NodePubkey,
+			Delinquent:    val.Delinquent,
 			StakeSharePct: val.Observation.StakeSharePct,
-			EvidenceID: projected.Evidence.ID,
+			EvidenceID:    projected.Evidence.ID,
 			EvidenceState: projected.Evidence.Status,
 			DecisionState: projected.DecisionState,
 		})
 	}
 	return ownerValidatorTelemetryResponse{
-		SchemaVersion: "koschei.owner-validator-telemetry.v1",
-		Network: report.Network,
-		Source: report.Source,
-		ObservedAt: report.ObservedAt.UTC(),
-		EvidenceStatus: "observed",
-		LiveAvailability: report.LiveAvailability,
+		SchemaVersion:     "koschei.owner-validator-telemetry.v1",
+		Network:           report.Network,
+		Source:            report.Source,
+		ObservedAt:        report.ObservedAt.UTC(),
+		EvidenceStatus:    "observed",
+		LiveAvailability:  report.LiveAvailability,
 		AnalysisPerformed: true,
-		CurrentCount: report.CurrentCount,
-		DelinquentCount: report.DelinquentCount,
-		TotalStake: report.TotalActivatedStake,
-		Sampled: len(rows),
-		SampleLimit: ownerValidatorSampleLimit,
-		Truncated: len(rows) < len(report.Validators),
-		Persisted: false,
-		SafetyVerdict: "not_evaluated",
-		Rows: rows,
+		CurrentCount:      report.CurrentCount,
+		DelinquentCount:   report.DelinquentCount,
+		TotalStake:        report.TotalActivatedStake,
+		Sampled:           len(rows),
+		SampleLimit:       ownerValidatorSampleLimit,
+		Truncated:         len(rows) < len(report.Validators),
+		Persisted:         false,
+		SafetyVerdict:     "not_evaluated",
+		Rows:              rows,
 	}, nil
 }
