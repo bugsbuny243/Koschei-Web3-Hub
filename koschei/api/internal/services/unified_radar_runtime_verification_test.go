@@ -12,7 +12,7 @@ func TestVerifyUnifiedRadarVerdictWithCurrentSigner(t *testing.T) {
 	t.Setenv(unifiedVerdictSigningPrivateKeyEnv, base64.RawURLEncoding.EncodeToString(private))
 	verdict := FinalizeUnifiedRadarVerdictContractForNetwork("MintReady", "solana-mainnet", UnifiedRadarVerdict{
 		RulesetVersion: UnifiedRadarRulesetVersion,
-		ActorRuleset: ActorDefenseRulesetVersion,
+		ActorRuleset:   ActorDefenseRulesetVersion,
 		TriggeredRules: []ActorDefenseRuleHit{{
 			RuleID: ActorRuleCompoundCreatorReuse, Tier: "compounding",
 			EvidenceStatus: "verified", Summary: "verified evidence",
@@ -26,16 +26,16 @@ func TestVerifyUnifiedRadarVerdictWithCurrentSigner(t *testing.T) {
 	}
 	cases := map[string]func(UnifiedRadarVerdict) UnifiedRadarVerdict{
 		"fake signed flag": func(v UnifiedRadarVerdict) UnifiedRadarVerdict { v.Signature = ""; return v },
-		"wrong target": func(v UnifiedRadarVerdict) UnifiedRadarVerdict { v.Target = "OtherMint"; return v },
-		"wrong network": func(v UnifiedRadarVerdict) UnifiedRadarVerdict { v.Network = "solana-devnet"; return v },
+		"wrong target":     func(v UnifiedRadarVerdict) UnifiedRadarVerdict { v.Target = "OtherMint"; return v },
+		"wrong network":    func(v UnifiedRadarVerdict) UnifiedRadarVerdict { v.Network = "solana-devnet"; return v },
 		"altered rule facts": func(v UnifiedRadarVerdict) UnifiedRadarVerdict {
 			v.TriggeredRules = append([]ActorDefenseRuleHit(nil), v.TriggeredRules...)
 			v.TriggeredRules[0].Summary = "altered fact"
 			return v
 		},
 		"wrong signature": func(v UnifiedRadarVerdict) UnifiedRadarVerdict { v.Signature = "not-ed25519"; return v },
-		"wrong key ID": func(v UnifiedRadarVerdict) UnifiedRadarVerdict { v.KeyID = "unknown"; return v },
-		"unsigned": func(v UnifiedRadarVerdict) UnifiedRadarVerdict { v.Signed = false; return v },
+		"wrong key ID":    func(v UnifiedRadarVerdict) UnifiedRadarVerdict { v.KeyID = "unknown"; return v },
+		"unsigned":        func(v UnifiedRadarVerdict) UnifiedRadarVerdict { v.Signed = false; return v },
 	}
 	for name, mutate := range cases {
 		t.Run(name, func(t *testing.T) {
