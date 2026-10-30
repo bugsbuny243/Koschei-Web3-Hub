@@ -131,3 +131,26 @@ func decodeCanonicalGlobalRadarEd25519(raw string, expectedSize int) ([]byte, er
 	}
 	return decoded, nil
 }
+
+// VerifyUnifiedRadarVerdictWithCurrentSigner authenticates the exact finalized
+// payload with the public key derived from this runtime's configured signer.
+// A Signed flag, digest or nonempty signature alone is not authentication.
+// This is the live customer readiness gate; historical/rotated decisions must
+// instead use the explicit trusted-key registry.
+func VerifyUnifiedRadarVerdictWithCurrentSigner(verdict UnifiedRadarVerdict) error {
+	keyID, privateKey, configured, err := unifiedVerdictSignerFromEnv()
+	if err != nil {
+		return fmt.Errorf("current verdict signer is invalid: %w", err)
+	}
+	if !configured {
+		return errors.New("current verdict signer is not configured")
+	}
+	registry, err := NewGlobalRadarTrustedVerdictRegistry([]GlobalRadarTrustedVerdictKey{{
+		KeyID:              keyID,
+		PublicKeyBase64URL: base64.RawURLEncoding.EncodeToString(privateKey.Public().(ed25519.PublicKey)),
+	}})
+	if err != nil {
+		return err
+	}
+	return VerifyUnifiedRadarVerdictWithTrustedRegistry(verdict, registry)
+}
