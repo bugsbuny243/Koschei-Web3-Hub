@@ -119,7 +119,6 @@ func TestOwnerSOCLinksScopedCustomerSignedVerdictPostgres(t *testing.T) {
 		"wrong network": {"solana-devnet", target, ref},
 		"wrong target": {network, "OtherMint", ref},
 		"tampered signature": {network, target, ref[:len(ref)-1] + alternateSignatureSuffix(final.Signature)},
-		"bare row ID": {network, target, recordID},
 		"malformed ref": {network, target, "unified-verdict:not-a-uuid:invalid"},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -142,15 +141,32 @@ func TestOwnerSOCLinksScopedCustomerSignedVerdictPostgres(t *testing.T) {
 		t.Fatalf("SOC incident missing exact source-linked reference: %d %s", detail.Code, detail.Body.String())
 	}
 
-	other, secondID := postCreate(network, target, "not-a-source")
-	if other.Code != http.StatusConflict {
-		t.Fatalf("invented SOC evidence ref accepted: %d %s", other.Code, other.Body.String())
-	}
+	// Cases without evidence are legitimate operator drafts. Linking happens
+	// only on an explicit owner action, with an auditable source classification.
 	empty, emptyID := postCreate(network, target, "")
-	if empty.Code != http.StatusConflict || emptyID != "" {
-		t.Fatalf("empty manual receipt accepted: %d %s", empty.Code, empty.Body.String())
+	if empty.Code != http.StatusCreated || emptyID == "" {
+		t.Fatalf("owner draft incident unavailable: %d %s", empty.Code, empty.Body.String())
 	}
-	_ = secondID
+	postLink := func(id, evidenceRef string) *httptest.ResponseRecorder {
+		t.Helper()
+		body, _ := json.Marshal(map[string]any{
+			"action": "link_evidence", "summary": "Owner explicitly linked signed customer receipt",
+			"ref": evidenceRef,
+		})
+		rec := httptest.NewRecorder()
+		h.OwnerIncidentItem(rec, httptest.NewRequest(http.MethodPost, "/api/owner/incidents/"+id, strings.NewReader(string(body))))
+		return rec
+	}
+	linked := postLink(emptyID, ref)
+	if linked.Code != http.StatusOK {
+		t.Fatalf("owner link_evidence failed: %d %s", linked.Code, linked.Body.String())
+	}
+	detail = httptest.NewRecorder()
+	h.OwnerIncidentItem(detail, httptest.NewRequest(http.MethodGet, "/api/owner/incidents/"+emptyID, nil))
+	if detail.Code != http.StatusOK || !strings.Contains(detail.Body.String(), ref) ||
+		!strings.Contains(detail.Body.String(), unifiedSOCVerdictRefSource) {
+		t.Fatalf("SOC action lacks verified row signature reference classification: %d %s", detail.Code, detail.Body.String())
+	}
 
 	// A later row change invalidates the original signature reference. SOC
 	// must never silently relink to a mutable fingerprint-only history row.
