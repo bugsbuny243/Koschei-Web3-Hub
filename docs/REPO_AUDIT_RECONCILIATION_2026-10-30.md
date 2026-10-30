@@ -72,3 +72,15 @@ The production `/api/security/radar/check` previously debited `security_radar_ch
 - Shared customer `ready` status now requires live verified ARVIS arm evidence **and** successful cryptographic verification. A signed no-grade result is still not a safety approval and missing evidence remains unknown.
 - `/api/security/radar/check` consumes paid output **only for ready**; signed=false, forged signatures, missing keys and incomplete evidence return the existing evidence-pending response without debit. No entitlement bypass or new API is introduced.
 - Tests verify actual signed result, forged signature, signed-only flag, post-sign tampering of rule facts/target/network, mismatched key and missing signer. Does not itself claim every evidence source is available or that full production end-to-end deployment has been proven.
+
+## 2026-10-30 Customer final verdict durability and receipt linkage
+
+Observed gap: `/api/security/radar/check` saved the ARVIS evidence-arm bundle but did not call the existing unified verdict persistence path for the canonical signed final. The owner scan already called `persistUnifiedRadarVerdict` and displayed history. Consequently the customer could receive a signed `ready` result and incur a premium debit without a corresponding durable, re-readable unified final in `security_unified_radar_verdicts`.
+
+- The customer token radar now builds its shared canonical envelope **before persistence** to capture the final after the summary/synchronization adapter, then writes that exact final via the existing unified verdict persistence path.
+- `customerCanonicalReceiptGate` requires the live Ed25519 verification contract, live verified evidence, a primary-DB `persisted` result, and a re-read history record with exactly matching signed payload hash, signature, signer key ID, deterministic digest, network, target, rule version and verdict. A compact TTL cache index or an unverified Signed flag never counts as a durable signed receipt.
+- Only an exact matching durable receipt permits the already-existing premium debit. Missing DB, persistence failure, read-back mismatch and absent signer result in **no charge**; if a final was authenticated but could not be linked, response status is `persistence_pending` with explicit `final_verdict_persistence`, no verified receipt and a diagnostic message.
+- The shared report and top-level response expose matching `final_verdict_persistence` and `final_verdict_receipt` metadata. They do not invent new SOC events or claim a full Railway deployment test. The old arm bundle persistence remains separate from unified final persistence.
+- Regression tests cover exact positive receipt, missing database, compact index, missing/forged signature, tampered evidence, target/network mismatch, wrong signer key and receipt fields.
+
+This work closes a concrete authenticated customer-to-history gap; live SOC production sink acceptance and end-to-end Railway invocation remain independent requirements.
