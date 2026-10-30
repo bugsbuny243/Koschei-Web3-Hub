@@ -141,18 +141,56 @@ func (h *Handler) SecurityRadarCheck(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = h.saveSecurityRadarBundle(ctx, claims.Sub, "manual_check", assembly.Core.Bundle)
 
-	status := customerInvestigationStatus(assembly.UnifiedVerdict, hasLiveEvidence)
+	// Build the canonical customer projection before persistence. The summary
+	// adapter can synchronize the final from evidence; persist the EXACT final
+	// sent to the client, not an older pre-projection signature.
+	response := customerInvestigationEnvelope(assembly, false)
+	customerFinal, finalOK := response["final_verdict"].(services.UnifiedRadarVerdict)
+	status := "evidence_pending"
+	if finalOK {
+		status = customerInvestigationStatus(customerFinal, hasLiveEvidence)
+	}
+	persistence := "not_attempted_without_verified_final"
+	var receipt map[string]any
 	charged := false
 	if status == "ready" {
-		if err := h.consumePremiumOutput(claims.Sub, claimEmail, "security_radar_check"); err != nil {
-			writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
-			return
+		historyStatus, history := h.persistUnifiedRadarVerdict(
+			ctx, assembly.DB, input.Network, "token", target, customerFinal, assembly.Behavior,
+		)
+		persistence = historyStatus
+		if stored, matched := customerCanonicalMatchingReceipt(customerFinal, history, input.Network, target); historyStatus != "persisted" || !matched {
+			status = "persistence_pending"
+			services.WriteSecurityAuditEvent(ctx, h.DB, securityAuditFromRequest(
+				r, "radar_check_final_receipt_pending", "customer", "warning",
+				map[string]any{"network": input.Network, "target": target, "persistence": persistence},
+			))
+		} else {
+			receipt = map[string]any{
+				"id": stored.ID, "fingerprint": stored.Fingerprint,
+				"signature": stored.Signature, "payload_hash": stored.PayloadHash,
+				"key_id": stored.KeyID, "rule_version": stored.RulesetVersion,
+			}
+			if err := h.consumePremiumOutput(claims.Sub, claimEmail, "security_radar_check"); err != nil {
+				writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
+				return
+			}
+			charged = true
 		}
-		charged = true
+	}
+	response["status"] = status
+	response["charged"] = charged
+	response["final_verdict_persistence"] = persistence
+	response["final_verdict_receipt"] = receipt
+	if status == "persistence_pending" {
+		response["message"] = "Signed evidence was collected, but no matching durable decision receipt could be verified. The investigation is not billed or marked ready."
+	}
+	if report, ok := response["investigation_report"].(map[string]any); ok {
+		report["final_verdict_persistence"] = persistence
+		report["final_verdict_receipt"] = receipt
 	}
 	h.logTool(claimEmail, "security_radar_check", status)
 	h.trackEvent(claimEmail, "security_radar_check", r.URL.Path)
-	writeJSON(w, http.StatusOK, customerInvestigationEnvelope(assembly, charged))
+	writeJSON(w, http.StatusOK, response)
 }
 
 func (h *Handler) SecurityRiskBadge(w http.ResponseWriter, r *http.Request) {
