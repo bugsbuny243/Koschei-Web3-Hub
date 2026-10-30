@@ -95,6 +95,8 @@
       const responseAction = select(['note',...(transitions[item.status] || [])].map(v => [v,v])); const note = node('textarea'); note.required = true; note.maxLength = 4000;
       const record = node('button','Record response'); record.type = 'submit'; workflow.append(field('Action',responseAction),field('Response note',note),record);
       workflow.addEventListener('submit',e => { e.preventDefault(); submit(workflow,'/api/owner/incidents/' + encodeURIComponent(id),{action:responseAction.value,summary:note.value}); }); root.append(workflow);
+      const handoff = node('a','Open complete handoff JSON (v2)'); handoff.href = '/api/owner/incidents/' + encodeURIComponent(id) + '?handoff=2';
+      root.append(handoff,node('p','Includes incident and SOC histories, assignment and first-response SLA. Owner labels and evidence references are not independently verified.','muted small'));
       root.append(node('h3','SOC handoff history'));
       const socHistory = timeline(data.events,true); root.append(socHistory);
       const more = node('button','Load earlier handoffs'); more.type = 'button'; more.hidden = !data.has_more_events; let cursor = data.events.at(-1)?.id;

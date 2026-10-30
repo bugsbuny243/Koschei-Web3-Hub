@@ -57,6 +57,23 @@ func TestSOCOperationsPostgres(t *testing.T) {
 			t.Fatalf("%s: %v", name, err)
 		}
 
+		if name == "123_security_center_incident_workflow.sql" {
+			var fixtureID string
+			if err := db.QueryRow(`INSERT INTO security_incident_cases (title) VALUES ('Explicit missing-schema export fixture') RETURNING id::text`).Scan(&fixtureID); err != nil {
+				t.Fatal(err)
+			}
+			for _, version := range []string{"1", "2"} {
+				rec := httptest.NewRecorder()
+				(&Handler{DB: db}).OwnerIncidentItem(rec, httptest.NewRequest("GET", "/api/owner/incidents/"+fixtureID+"?handoff="+version, nil))
+				want := 200
+				if version == "2" {
+					want = 503
+				}
+				if rec.Code != want {
+					t.Fatalf("missing schema handoff v%s: %d %s", version, rec.Code, rec.Body.String())
+				}
+			}
+		}
 		observed := probeSOCOperations(context.Background(), db)
 		if name == "123_security_center_incident_workflow.sql" && observed.State != "unavailable_not_accepted" {
 			t.Fatalf("missing migration claimed ready: %+v", observed)
@@ -141,6 +158,7 @@ func TestSOCOperationsPostgres(t *testing.T) {
 	if item["sla"].(map[string]any)["state"] != "breached" || len(after["events"].([]any)) != 3 {
 		t.Fatal(after)
 	}
+	testSOCHandoffExport(t, h, id, false)
 	// Initial severity is immutable history; changing current severity cannot reset SLA.
 	if _, err := db.Exec(`UPDATE security_incident_cases SET severity='info' WHERE id=$1::uuid`, id); err != nil {
 		t.Fatal(err)
@@ -193,4 +211,5 @@ func TestSOCOperationsPostgres(t *testing.T) {
 	if w := request("POST", casePath, `{"action":"assign","assignee":"C","summary":"Closed case","expected_version":3}`); w.Code != 409 {
 		t.Fatal(w.Body.String())
 	}
+	testSOCHandoffExport(t, h, id, true)
 }

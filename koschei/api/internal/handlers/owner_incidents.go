@@ -317,7 +317,7 @@ func (h *Handler) OwnerIncidentItem(w http.ResponseWriter, r *http.Request) {
 	}
 	switch r.Method {
 	case http.MethodGet:
-		if r.URL.Query().Get("handoff") == "1" {
+		if handoff := r.URL.Query().Get("handoff"); handoff == "1" || handoff == "2" {
 			h.ownerIncidentHandoff(w, r, id)
 			return
 		}
