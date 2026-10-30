@@ -1,0 +1,29 @@
+name: Temporary ARVIS authority formatting snapshot
+
+on:
+  pull_request:
+    paths:
+      - 'koschei/api/internal/services/security_radar_evidence_gate.go'
+      - 'koschei/api/internal/services/security_radar_evidence_gate_test.go'
+      - 'koschei/api/internal/handlers/unified_investigation_report.go'
+      - 'koschei/api/internal/handlers/unified_investigation_report_test.go'
+      - '.github/workflows/temporary-arvis-authority-format.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Print normalized Go source
+        run: |
+          set -euo pipefail
+          for file in koschei/api/internal/services/security_radar_evidence_gate.go koschei/api/internal/services/security_radar_evidence_gate_test.go koschei/api/internal/handlers/unified_investigation_report.go koschei/api/internal/handlers/unified_investigation_report_test.go; do
+            gofmt -w "$file"
+            echo "FORMATTED_BEGIN:$file"
+            base64 -w0 "$file"
+            echo
+            echo "FORMATTED_END:$file"
+          done
