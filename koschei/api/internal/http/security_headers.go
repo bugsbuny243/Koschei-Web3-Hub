@@ -2,9 +2,9 @@ package http
 
 import (
 	"net/http"
-	"path"
 	"net/url"
 	"os"
+	"path"
 	"strings"
 )
 
