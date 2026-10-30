@@ -10,7 +10,7 @@ import (
 const customerInvestigationResponseSchemaVersion = "koschei-customer-investigation-response-v3"
 
 func customerInvestigationStatus(final services.UnifiedRadarVerdict, hasLiveEvidence bool) string {
-	if final.Signed && hasLiveEvidence {
+	if hasLiveEvidence && services.VerifyUnifiedRadarVerdictWithCurrentSigner(final) == nil {
 		return "ready"
 	}
 	return "evidence_pending"
