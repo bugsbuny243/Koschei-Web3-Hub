@@ -146,7 +146,7 @@ func VerifyUnifiedRadarVerdictWithCurrentSigner(verdict UnifiedRadarVerdict) err
 		return errors.New("current verdict signer is not configured")
 	}
 	registry, err := NewGlobalRadarTrustedVerdictRegistry([]GlobalRadarTrustedVerdictKey{{
-		KeyID: keyID,
+		KeyID:              keyID,
 		PublicKeyBase64URL: base64.RawURLEncoding.EncodeToString(privateKey.Public().(ed25519.PublicKey)),
 	}})
 	if err != nil {
