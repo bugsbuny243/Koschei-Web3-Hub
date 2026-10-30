@@ -10,10 +10,10 @@ func TestCustomerInvestigationStatusRequiresCryptographicallyVerifiedLiveVerdict
 	configureHandlerVerdictTestSigner(t)
 	valid := services.FinalizeUnifiedRadarVerdictContractForNetwork("MintReady", "solana-mainnet", services.UnifiedRadarVerdict{
 		RulesetVersion: services.UnifiedRadarRulesetVersion,
-		ActorRuleset: services.ActorDefenseRulesetVersion,
+		ActorRuleset:   services.ActorDefenseRulesetVersion,
 		TriggeredRules: []services.ActorDefenseRuleHit{{
 			RuleID: services.ActorRuleCompoundCreatorReuse,
-			Tier: "compounding", EvidenceStatus: "verified", Summary: "verified actor evidence",
+			Tier:   "compounding", EvidenceStatus: "verified", Summary: "verified actor evidence",
 		}},
 	})
 	if !valid.Signed || valid.Signature == "" {
