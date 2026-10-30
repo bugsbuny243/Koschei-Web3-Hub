@@ -40,3 +40,16 @@ Sources remain in Git for tests and future deliberate integrations; they are **n
 ## Acceptance and remaining work
 
 The code changes require exact-PR-head Go tests, relevant CI gates, and a new reachability audit before merging. The outstanding A/B functions require individual categorization (prod-intended, compatibility, test helper, explicitly retired), verified runtime call paths, source/UNKNOWN semantics, authorization and budget controls, and tests that exercise **registered routes** rather than invoking the helper in isolation. None of these 568 functions are declared universally production-wired by this static containment patch.
+
+## 2026-10-30 owner Solana validator evidence integration candidate
+
+A deliberately opt-in and operator-triggered path now connects two previously test-only functions: `services.ProbeSolanaValidatorTelemetry` and `services.ProjectSolanaValidatorTelemetryToGlobalRadar`. A successful request reads Solana `getVoteAccounts` via the existing governed RPC client, normalizes a bounded sample of up to 12 validator observations and exposes their evidence references through an owner-authenticated API and console.
+
+- API: `GET /api/owner/radar/solana/validators` (owner-only).
+- Private UI: `GET /owner/solana-validators` (owner-only), linked from the owner control center; collection requires an explicit button click.
+- Gate: `KOSCHEI_OWNER_SOLANA_VALIDATOR_PROBE_ENABLED=1` **and** a configured `SOLANA_RPC_URL`. Default is disabled.
+- Provider budget: a 12-second request timeout, successful sample cached for 10 minutes, failures throttled for 30 seconds and concurrent retries single-slotted. No arbitrary user-selected endpoints.
+- Truth boundary: `observed` only; no decentralization score, risk rating, safety verdict, signed decision, durable storage, auto-worker or customer-decision promotion. Missing/invalid provider data fails closed with `unknown`.
+- Tests: registered route owner authentication, disabled/unconfigured behavior, read-only fake-RPC roundtrip, cache/failure budget, invalid result rejection and projection evidence semantics.
+
+**Acceptance still required:** exact-head CI/Go race and deployed owner login, production RPC access and final operator observation. The previous A/B ledger items not named above remain to be reviewed; the historical totals must not be restated as the current counts.
