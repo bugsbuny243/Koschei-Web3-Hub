@@ -64,19 +64,26 @@ func EvidenceBackedSecurityRadarBundleContext(ctx context.Context, bundle Securi
 	return applyResolvedArvisProvider(bundle)
 }
 
+// EvidenceBackedFinalSecurityRadarVerdict is a compatibility adapter, not a
+// canonical grade authority. An unrelated arm's evidence cannot authorize a
+// final engine's score or signature.
 func EvidenceBackedFinalSecurityRadarVerdict(bundle SecurityRadarBundle) SecurityRadarFinalVerdict {
-	bundle = EvidenceBackedSecurityRadarBundle(bundle)
+	return EvidenceBackedLegacyFinalFromGatedBundle(EvidenceBackedSecurityRadarBundle(bundle))
+}
+
+// EvidenceBackedLegacyFinalFromGatedBundle observes a previously gated bundle.
+// It never enriches, re-queries RPC, signs, or issues a numeric ARVIS grade.
+// EvaluateUnifiedRadarVerdict remains the sole final grade authority.
+func EvidenceBackedLegacyFinalFromGatedBundle(bundle SecurityRadarBundle) SecurityRadarFinalVerdict {
 	if !SecurityRadarHasLiveEvidence(bundle) {
-		return SecurityRadarFinalVerdict{Grade: "-", RiskIndex: 0, RiskLevel: "unknown", Verdict: SecurityRadarInsufficientEvidenceMessage, Recommendation: "insufficient_evidence", RuleVersion: SecurityRadarRuleVersion, Signed: false, Signature: ""}
-	}
-	if arms := ArvisArmsFromBundle(bundle); len(arms) > 0 {
-		for _, arm := range arms {
-			if arm.ModuleID == ModuleFinalVerdictEngine {
-				return finalVerdictFromArm(arm)
-			}
+		return SecurityRadarFinalVerdict{
+			Grade: "-", RiskIndex: 0, RiskLevel: "unknown",
+			Verdict:        SecurityRadarInsufficientEvidenceMessage,
+			Recommendation: "insufficient_evidence",
+			RuleVersion:    SecurityRadarRuleVersion, Signed: false, Signature: "",
 		}
 	}
-	return FinalSecurityRadarVerdict(bundle)
+	return arvisCompatibilityFinal()
 }
 
 func insufficientEvidenceVerdict(verdict SecurityRadarVerdict) SecurityRadarVerdict {

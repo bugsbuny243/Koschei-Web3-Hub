@@ -53,3 +53,14 @@ A deliberately opt-in and operator-triggered path now connects two previously te
 - Tests: registered route owner authentication, disabled/unconfigured behavior, read-only fake-RPC roundtrip, cache/failure budget, invalid result rejection and projection evidence semantics.
 
 **Acceptance still required:** exact-head CI/Go race and deployed owner login, production RPC access and final operator observation. The previous A/B ledger items not named above remain to be reviewed; the historical totals must not be restated as the current counts.
+
+## 2026-10-30 ARVIS canonical final authority correction
+
+The historical B-list function `EvidenceBackedFinalSecurityRadarVerdict` was an **unsafe legacy interpretation**, not a missing production scorer. The legacy implementation could select a high-risk-index pump/pool arm when only a different arm supplied verified evidence, or return a compatibility `final_verdict_engine` arm. Neither has canonical signing authority. The production decision contract explicitly delegates final grade authority to `EvaluateUnifiedRadarVerdictV140` / `FinalizeUnifiedRadarVerdictContractForNetwork`.
+
+- The legacy helper is now **unsigned and ungraded**: if no non-final verified evidence exists it reports `insufficient_evidence`; otherwise it returns the existing `evaluate_unified_rules` compatibility placeholder. It cannot choose a legacy arm score or echo a fabricated signature.
+- The side-effect-free `EvidenceBackedLegacyFinalFromGatedBundle` consumes an already gated bundle; it must never enrich the bundle or re-query provider RPC.
+- The shared investigation report records `final_authority_boundary`: explicit legacy non-authority, evidence-availability status, canonical engine, canonical signed/grade state and immutable-decision assertion. This field is **diagnostic**, not a second verdict, does not alter the canonical verdict and is returned through the existing owner/customer unified report interfaces.
+- Regression tests cover forged legacy final arm, unrelated verified arm, unequal risk scores, caller-neutral report output and unchanged canonical verdict.
+- No claim of new production signatures, complete RPC evidence, or a finished SOC is made. Canonical collector/signature/persistence acceptance remains independently gated.
+

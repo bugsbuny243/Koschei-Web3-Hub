@@ -132,3 +132,46 @@ func TestUnifiedInvestigationProjectsCreatorFieldsFromCanonicalActorResult(t *te
 		t.Fatalf("stored-only distribution projection should remain unavailable: %#v", distribution)
 	}
 }
+
+func TestLegacyFinalAuthorityVisibleInSharedReportWithoutChangingCanonicalVerdict(t *testing.T) {
+	core := holderIntelligenceCoreResult{
+		Request: services.SecurityRadarRequest{
+			Target:  "MintFinalBoundary111111111111111111111111111",
+			Network: "solana-mainnet", Mode: "stored_only_projection",
+		},
+		Bundle: services.SecurityRadarBundle{
+			PumpSybilRadar: services.SecurityRadarVerdict{
+				ModuleID: services.ModulePumpSybilRadar,
+				Grade:    "A", RiskIndex: 90, RiskLevel: "high",
+				Signed: true, Signature: "untrusted-legacy-signature",
+				Signals: map[string]any{"real_onchain_evidence": true},
+			},
+			Metadata: map[string]any{"arvis_arms": []services.SecurityRadarVerdict{
+				{ModuleID: services.ModulePumpSybilRadar,
+					EvidenceVerified: true, Signed: true},
+				{ModuleID: services.ModuleFinalVerdictEngine,
+					Grade: "A", RiskIndex: 1, Signed: true, Signature: "fabricated-final",
+					Signals: map[string]any{"verified_evidence": true}},
+			}},
+		},
+		SourceContext: map[string]any{},
+		Cluster:       services.HolderClusterAnalysis{Findings: []string{}},
+	}
+	assembly := (&Handler{}).assembleUnifiedInvestigationReport(context.Background(), core)
+	boundary, ok := assembly.Report["final_authority_boundary"].(map[string]any)
+	if !ok {
+		t.Fatalf("final authority boundary missing from shared report: %#v", assembly.Report["final_authority_boundary"])
+	}
+	if boundary["legacy_authoritative"] != false || boundary["legacy_signed"] != false ||
+		boundary["legacy_grade"] != "-" || boundary["legacy_verified_arm_evidence_present"] != true ||
+		boundary["canonical_engine"] != "EvaluateUnifiedRadarVerdictV140" ||
+		boundary["decision_mutated"] != false {
+		t.Fatalf("legacy grading or signing escaped canonical boundary: %#v", boundary)
+	}
+	canonical, ok := assembly.Report["final_verdict"].(services.UnifiedRadarVerdict)
+	if !ok || canonical.Grade != assembly.UnifiedVerdict.Grade ||
+		boundary["canonical_grade"] != canonical.Grade ||
+		boundary["canonical_signed"] != canonical.Signed {
+		t.Fatalf("canonical final diverged from report: %#v / %#v", canonical, boundary)
+	}
+}
