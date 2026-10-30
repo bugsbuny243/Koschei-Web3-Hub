@@ -244,7 +244,7 @@ func (h *Handler) ownerIncidentCreate(w http.ResponseWriter, r *http.Request) {
 
 	resolvedEvidenceSources := make(map[string]string, len(input.EvidenceRefs))
 	for _, ref := range input.EvidenceRefs {
-		source, resolveErr := incidentEvidenceSource(r.Context(), tx, ref)
+		source, resolveErr := incidentEvidenceSource(r.Context(), tx, ref, input.Network, input.Target)
 		if resolveErr != nil {
 			writeAPIError(w, http.StatusServiceUnavailable, APICodeServiceUnavailable, "Incident evidence reference could not be resolved")
 			return
@@ -410,10 +410,13 @@ func incidentStatusTransitionAllowed(current, next string) bool {
 	}
 }
 
-func incidentEvidenceSource(ctx context.Context, tx *sql.Tx, ref string) (string, error) {
+func incidentEvidenceSource(ctx context.Context, tx *sql.Tx, ref, network, target string) (string, error) {
 	ref = strings.TrimSpace(ref)
 	if tx == nil || ref == "" {
 		return "", nil
+	}
+	if strings.HasPrefix(ref, unifiedSOCVerdictRefPrefix) {
+		return resolveUnifiedSOCVerdictReference(ctx, tx, ref, network, target)
 	}
 	var source string
 	err := tx.QueryRowContext(ctx, `
@@ -560,8 +563,8 @@ func (h *Handler) ownerIncidentAction(w http.ResponseWriter, r *http.Request, id
 	}
 	defer tx.Rollback()
 
-	var exists, currentStatus string
-	if err := tx.QueryRowContext(r.Context(), "SELECT id::text,status FROM security_incident_cases WHERE id=$1::uuid FOR UPDATE", id).Scan(&exists, &currentStatus); err == sql.ErrNoRows {
+	var exists, currentStatus, incidentNetwork, incidentTarget string
+	if err := tx.QueryRowContext(r.Context(), "SELECT id::text,status,network,target FROM security_incident_cases WHERE id=$1::uuid FOR UPDATE", id).Scan(&exists, &currentStatus, &incidentNetwork, &incidentTarget); err == sql.ErrNoRows {
 		writeAPIError(w, http.StatusNotFound, APICodeNotFound, "Incident was not found")
 		return
 	} else if err != nil {
@@ -605,7 +608,7 @@ func (h *Handler) ownerIncidentAction(w http.ResponseWriter, r *http.Request, id
 	}
 	resolvedEvidenceSource := ""
 	if input.Action == "link_evidence" {
-		resolvedEvidenceSource, err = incidentEvidenceSource(r.Context(), tx, input.Ref)
+		resolvedEvidenceSource, err = incidentEvidenceSource(r.Context(), tx, input.Ref, incidentNetwork, incidentTarget)
 		if err != nil {
 			writeAPIError(w, http.StatusServiceUnavailable, APICodeServiceUnavailable, "Incident evidence reference could not be resolved")
 			return
