@@ -64,3 +64,11 @@ The historical B-list function `EvidenceBackedFinalSecurityRadarVerdict` was an 
 - Regression tests cover forged legacy final arm, unrelated verified arm, unequal risk scores, caller-neutral report output and unchanged canonical verdict.
 - No claim of new production signatures, complete RPC evidence, or a finished SOC is made. Canonical collector/signature/persistence acceptance remains independently gated.
 
+## 2026-10-30 Customer live canonical-signature readiness / debit boundary
+
+The production `/api/security/radar/check` previously debited `security_radar_check` credits when any verified ARVIS arm evidence existed, independently of whether the unified customer final was signed. The shared `customerInvestigationStatus` also accepted the boolean `Signed` flag as sufficient authentication when live evidence existed. A flag is not a cryptographic proof.
+
+- `VerifyUnifiedRadarVerdictWithCurrentSigner` authenticates the existing finalized canonical Ed25519 payload via the trusted-key verifier, using only the **public key derived from the currently configured runtime signer**. It binds target, network, rules, evidence, created_at, key ID and canonical payload hash. Missing or invalid signer configuration fails closed; historical keys use the separate trusted registry and are **not** implicitly accepted by the live readiness gate.
+- Shared customer `ready` status now requires live verified ARVIS arm evidence **and** successful cryptographic verification. A signed no-grade result is still not a safety approval and missing evidence remains unknown.
+- `/api/security/radar/check` consumes paid output **only for ready**; signed=false, forged signatures, missing keys and incomplete evidence return the existing evidence-pending response without debit. No entitlement bypass or new API is introduced.
+- Tests verify actual signed result, forged signature, signed-only flag, post-sign tampering of rule facts/target/network, mismatched key and missing signer. Does not itself claim every evidence source is available or that full production end-to-end deployment has been proven.
