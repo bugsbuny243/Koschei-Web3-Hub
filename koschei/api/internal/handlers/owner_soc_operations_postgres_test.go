@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -54,6 +55,14 @@ func TestSOCOperationsPostgres(t *testing.T) {
 		}
 		if _, err := db.Exec(string(raw)); err != nil {
 			t.Fatalf("%s: %v", name, err)
+		}
+
+		observed := probeSOCOperations(context.Background(), db)
+		if name == "123_security_center_incident_workflow.sql" && observed.State != "unavailable_not_accepted" {
+			t.Fatalf("missing migration claimed ready: %+v", observed)
+		}
+		if name == "137_soc_operations.sql" && (!observed.MetadataReadable || !observed.HistoryReadable || observed.State != "schema_read_observed_not_write_accepted") {
+			t.Fatalf("operations schema unreadable: %+v", observed)
 		}
 	}
 	var id string

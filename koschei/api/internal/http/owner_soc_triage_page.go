@@ -117,7 +117,8 @@ async function loadReadiness(){
    var data=await response.json();
    if(data.ok!==true||!data.readiness){throw new Error("unverified read response");}
    var snapshot=data.readiness;
-   readiness.textContent="SOC storage: "+label(snapshot.state)+
+   var operations=snapshot.operations;
+   readiness.textContent="Operations primary storage: "+(operations?label(operations.state):"UNVERIFIED")+" · Legacy SOC storage: "+label(snapshot.state)+
      " · sampled cases: "+(Number.isInteger(snapshot.sampled_cases)?String(snapshot.sampled_cases):"unknown")+
      " · audited actions observed: "+(snapshot.any_audited_actions===true?"yes":"no")+
      " · cases linked to audit rows: "+(Number.isInteger(snapshot.linked_audit_case_samples)?String(snapshot.linked_audit_case_samples):"unknown")+
