@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -50,5 +51,13 @@ func TestSOCRuntimeReadinessFailsClosedWithoutDB(t *testing.T) {
 	if payload.Readiness.SchemaVersion != ownerSOCReadinessVersion ||
 		payload.Readiness.Scope != socReadinessScope || payload.Readiness.Boundary != socReadinessBoundary {
 		t.Fatal("readiness truth-boundary contract missing")
+	}
+}
+
+func TestSOCReadinessOperationsNeverUsesReadReplicaAsPrimary(t *testing.T) {
+	// An absent primary cannot inherit readiness from a legacy read source.
+	got := probeSOCOperations(context.Background(), nil)
+	if got.State != "unavailable_not_accepted" || got.MetadataReadable || got.HistoryReadable || got.ReadSource != "primary_db" {
+		t.Fatalf("%+v", got)
 	}
 }

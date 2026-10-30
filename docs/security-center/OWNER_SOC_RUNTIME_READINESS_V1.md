@@ -44,3 +44,17 @@ The response contains `schema_version`, `as_of`, `read_source` (read store vs pr
 - Runtime observations against an authorized deployment after approval, followed by manual release review.
 
 **No files or tables are deleted; no migrations, infra, secrets, background workers, autonomous on-chain actions, or existing endpoints are disabled.**
+
+## Operations storage projection
+
+The additive `readiness.operations` field separately probes the primary database
+used by `/api/owner/soc/queue` and `/api/owner/soc/case`. It validates required
+columns and SELECT access on both migration-137 tables with zero-row queries.
+Missing primary storage, missing migration, incompatible schema or failed access
+stays `unavailable_not_accepted`. A readable schema reports
+`schema_read_observed_not_write_accepted`, including when tables are empty; it
+makes no write, audit immutability, staffing or SLA-compliance claim.
+
+Legacy readiness retains its existing status and HTTP behavior. Consumers must
+inspect the operations substate for the new queue. The owner triage page displays
+both states. No source rows, assignments or audit records are changed by probing.
