@@ -140,10 +140,13 @@ async function loadCandidates(){
      cell(tr,label(item.grade),label(item.verdict));
      cell(tr,item.linked_to_soc===true?"Linked to Owner SOC":"Owner review required","No autonomous action");
      var td=document.createElement("td"),ref=text("code",item.evidence_ref),copy=text("button","Copy reference");
-     copy.type="button";copy.addEventListener("click",async function(value){return async function(){
-       try{await navigator.clipboard.writeText(value);signedStatus.textContent="Signed evidence reference copied. Owner action is still required.";}
-       catch(_){signedStatus.textContent="Clipboard not available. Select the displayed reference manually.";}
-     };}(item.evidence_ref));
+     copy.type="button";
+     (function(value){
+       copy.addEventListener("click",async function(){
+         try{await navigator.clipboard.writeText(value);signedStatus.textContent="Signed evidence reference copied. Owner action is still required.";}
+         catch(_){signedStatus.textContent="Clipboard unavailable. Select the displayed reference manually.";}
+       });
+     })(item.evidence_ref);
      td.appendChild(ref);td.appendChild(document.createElement("br"));td.appendChild(copy);tr.appendChild(td);signedRows.appendChild(tr);
    }
  }catch(e){
