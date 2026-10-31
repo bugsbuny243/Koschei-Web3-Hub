@@ -173,10 +173,10 @@ func (s *UnifiedRadarVerdictStore) History(ctx context.Context, network, targetK
 		limit = 20
 	}
 	rows, err := s.DB.QueryContext(ctx, `
-		SELECT id::text,network,target_kind,target_id,grade,verdict,ruleset_version,
-		       actor_ruleset_version,COALESCE(digest,''),signed,COALESCE(signature,''),
-		       COALESCE(signature_algorithm,''),COALESCE(key_id,''),COALESCE(payload_hash,''),fingerprint,
-		       triggered_rules,watch_flags,decision_path,behavior_signals,
+		SELECT v.id::text,v.network,v.target_kind,v.target_id,v.grade,v.verdict,v.ruleset_version,
+		       v.actor_ruleset_version,COALESCE(v.digest,''),v.signed,COALESCE(v.signature,''),
+		       COALESCE(v.signature_algorithm,''),COALESCE(v.key_id,''),COALESCE(v.payload_hash,''),v.fingerprint,
+		       v.triggered_rules,v.watch_flags,v.decision_path,v.behavior_signals,
 		       v.first_seen_at,v.last_seen_at,v.scan_count,COALESCE(receipt.id::text,'')
 		FROM security_unified_radar_verdicts v
 		LEFT JOIN security_unified_verdict_receipts receipt
