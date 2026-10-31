@@ -14,20 +14,21 @@ const ownerSOCReadinessVersion = "koschei.soc-runtime-readiness.v1"
 // No source identifiers, credentials, DSNs, customer data or case contents are
 // returned by this owner-only diagnostic. Values are bounded to a read sample.
 type ownerSOCReadinessSnapshot struct {
-	Operations           socOperationsReadiness `json:"operations"`
-	SchemaVersion        string                 `json:"schema_version"`
-	AsOf                 time.Time              `json:"as_of"`
-	State                string                 `json:"state"`
-	ReadSource           string                 `json:"read_source"`
-	CasesTableReadable   bool                   `json:"cases_table_readable"`
-	ActionsTableReadable bool                   `json:"actions_table_readable"`
-	SampledCases         int                    `json:"sampled_cases"`
-	AnyAuditedActions    bool                   `json:"any_audited_actions"`
-	LinkedAuditCases     int                    `json:"linked_audit_case_samples"`
-	AssignedCaseSamples  int                    `json:"assigned_case_samples"`
-	EscalationSamples    int                    `json:"escalation_samples"`
-	Scope                string                 `json:"scope"`
-	Boundary             string                 `json:"boundary"`
+	Operations            socOperationsReadiness     `json:"operations"`
+	SignedVerdictReceipts ownerSOCSignedReceiptProbe `json:"signed_verdict_receipts"`
+	SchemaVersion         string                     `json:"schema_version"`
+	AsOf                  time.Time                  `json:"as_of"`
+	State                 string                     `json:"state"`
+	ReadSource            string                     `json:"read_source"`
+	CasesTableReadable    bool                       `json:"cases_table_readable"`
+	ActionsTableReadable  bool                       `json:"actions_table_readable"`
+	SampledCases          int                        `json:"sampled_cases"`
+	AnyAuditedActions     bool                       `json:"any_audited_actions"`
+	LinkedAuditCases      int                        `json:"linked_audit_case_samples"`
+	AssignedCaseSamples   int                        `json:"assigned_case_samples"`
+	EscalationSamples     int                        `json:"escalation_samples"`
+	Scope                 string                     `json:"scope"`
+	Boundary              string                     `json:"boundary"`
 }
 
 const socReadinessScope = "read_only_latest_50_cases; audit_event_existence; sampled_case_action_linkage; latest_assignment_and_escalation_projections_only"
@@ -69,6 +70,7 @@ func (h *Handler) OwnerSOCReadiness(w http.ResponseWriter, r *http.Request) {
 		primary = h.DB
 	}
 	snapshot.Operations = probeSOCOperations(ctx, primary)
+	snapshot.SignedVerdictReceipts = probeOwnerSOCSignedReceipts(ctx, nil)
 	if h == nil || (h.DBRead == nil && h.DB == nil) {
 		socReadinessUnavailable(w, snapshot)
 		return
@@ -84,6 +86,9 @@ func (h *Handler) OwnerSOCReadiness(w http.ResponseWriter, r *http.Request) {
 		socReadinessUnavailable(w, snapshot)
 		return
 	}
+	// Read-only bounded cryptographic sample; must not be treated as a live write
+	// or production customer-to-SOC acceptance result.
+	snapshot.SignedVerdictReceipts = probeOwnerSOCSignedReceipts(ctx, db)
 
 	// A missing table is a true failure: do not report empty as healthy.
 	var casesPresent, actionsPresent bool

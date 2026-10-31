@@ -56,6 +56,7 @@ func TestOwnerSOCImmutableCanonicalReceiptPostgres(t *testing.T) {
 		"123_security_center_incident_workflow.sql",
 		"137_soc_operations.sql",
 		"138_unified_verdict_immutable_receipts.sql",
+		"139_unified_verdict_receipt_recent_proof_index.sql",
 	} {
 		raw, err := os.ReadFile(filepath.Join("..", "..", "migrations", migration))
 		if err != nil {
@@ -64,6 +65,11 @@ func TestOwnerSOCImmutableCanonicalReceiptPostgres(t *testing.T) {
 		if _, err := db.Exec(string(raw)); err != nil {
 			t.Fatalf("migration %s: %v", migration, err)
 		}
+	}
+
+	emptyReadiness := probeOwnerSOCSignedReceipts(context.Background(), db)
+	if emptyReadiness.State != "not_accepted_no_persisted_signed_receipts" || !emptyReadiness.LedgerTableReadable {
+		t.Fatalf("empty immutable ledger claimed acceptance: %+v", emptyReadiness)
 	}
 	configureHandlerVerdictTestSigner(t)
 	key, configured, err := services.ActiveVerdictVerificationKey()
@@ -94,6 +100,13 @@ func TestOwnerSOCImmutableCanonicalReceiptPostgres(t *testing.T) {
 	if err != nil || len(history) != 1 || history[0].LedgerID != record.LedgerID {
 		t.Fatalf("immutable receipt not returned by durable history: %+v err=%v", history, err)
 	}
+
+	verifiedReadiness := probeOwnerSOCSignedReceipts(context.Background(), db)
+	if verifiedReadiness.State != "bounded_historical_signatures_verified_not_end_to_end_accepted" ||
+		verifiedReadiness.SampledReceipts != 1 || verifiedReadiness.VerifiedReceipts != 1 ||
+		!verifiedReadiness.IndependentTrustLoaded {
+		t.Fatalf("authenticated historical receipt was not verified: %+v", verifiedReadiness)
+	}
 	ref := immutableSOCVerdictRefPrefix + record.LedgerID + ":" + record.Signature
 	h := &Handler{DB: db, DBRead: db}
 	postCreate := func(network, target, evidence string) *httptest.ResponseRecorder {
@@ -120,7 +133,12 @@ func TestOwnerSOCImmutableCanonicalReceiptPostgres(t *testing.T) {
 			}
 		})
 	}
+
 	t.Setenv("KOSCHEI_ARVIS_STREAM_TRUSTED_VERDICT_KEYS_JSON", "")
+	if probe := probeOwnerSOCSignedReceipts(context.Background(), db); probe.State != "not_accepted_independent_trust_unavailable" ||
+		probe.VerifiedReceipts != 0 || probe.IndependentTrustLoaded {
+		t.Fatalf("missing independent keys claimed verified signatures: %+v", probe)
+	}
 	if w := postCreate(final.Network, final.Target, ref); w.Code != http.StatusConflict {
 		t.Fatalf("no independent trust registry accepted: %d %s", w.Code, w.Body.String())
 	}
@@ -139,8 +157,13 @@ func TestOwnerSOCImmutableCanonicalReceiptPostgres(t *testing.T) {
 		record.ID, record.Signature[:len(record.Signature)-1]+alternateSignatureSuffix(record.Signature)); err != nil {
 		t.Fatal(err)
 	}
+
 	if w := postCreate(final.Network, final.Target, ref); w.Code != http.StatusCreated {
 		t.Fatalf("later rescan invalidated immutable receipt: %d %s", w.Code, w.Body.String())
+	}
+	if probe := probeOwnerSOCSignedReceipts(context.Background(), db); probe.State != "bounded_historical_signatures_verified_not_end_to_end_accepted" ||
+		probe.VerifiedReceipts != 1 {
+		t.Fatalf("mutable rescan broke historical signature verification: %+v", probe)
 	}
 	if _, err := db.Exec("UPDATE security_unified_verdict_receipts SET target_id='tampered' WHERE id=$1::uuid", record.LedgerID); err == nil {
 		t.Fatal("append-only ledger permitted UPDATE")
@@ -148,7 +171,23 @@ func TestOwnerSOCImmutableCanonicalReceiptPostgres(t *testing.T) {
 	if _, err := db.Exec("DELETE FROM security_unified_verdict_receipts WHERE id=$1::uuid", record.LedgerID); err == nil {
 		t.Fatal("append-only ledger permitted DELETE")
 	}
+
 	if _, err := db.Exec("TRUNCATE security_unified_verdict_receipts"); err == nil {
 		t.Fatal("append-only ledger permitted TRUNCATE")
+	}
+	// Direct SQL inserts are not a trust root: even if a database writer injects
+	// plausible metadata, only an independently verified signed payload counts.
+	if _, err := db.Exec(`
+		INSERT INTO security_unified_verdict_receipts
+			(verdict_id,network,target_kind,target_id,signature,signature_algorithm,key_id,payload_hash,signed_payload)
+		SELECT verdict_id,network,target_kind,target_id,repeat('A',86),signature_algorithm,
+		       key_id,payload_hash,signed_payload
+		FROM security_unified_verdict_receipts WHERE id=$1::uuid
+	`, record.LedgerID); err != nil {
+		t.Fatalf("failed to insert deliberately untrusted test-only receipt: %v", err)
+	}
+	if probe := probeOwnerSOCSignedReceipts(context.Background(), db); probe.State != "not_accepted_immutable_receipt_integrity_failure" ||
+		probe.VerifiedReceipts == probe.SampledReceipts {
+		t.Fatalf("forged database receipt was presented as verified: %+v", probe)
 	}
 }
