@@ -1,0 +1,27 @@
+name: Temporary regenerate OpenAPI for signed SOC route
+on:
+  push:
+    branches: [feat/owner-soc-signed-verdict-triage-20261031]
+permissions:
+  contents: write
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: koschei/api/go.mod
+      - name: Regenerate canonical route map and remove temporary workflow
+        run: |
+          set -euo pipefail
+          cd koschei/api
+          go run ./cmd/openapi-gen
+          go run ./cmd/openapi-gen -check
+          cd ../..
+          git config user.name 'koschei-ci-generator'
+          git config user.email 'actions@users.noreply.github.com'
+          git rm .github/workflows/temp-soc-openapi-generate.yml
+          git add koschei/api/openapi.yaml
+          git commit -m 'docs(api): regenerate OpenAPI for owner SOC signed candidates'
+          git push origin HEAD:feat/owner-soc-signed-verdict-triage-20261031
