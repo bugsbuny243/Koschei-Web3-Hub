@@ -20,7 +20,7 @@ button,select{background:#143744;border:1px solid #41727e;color:#eefaf6;padding:
 button{cursor:pointer}button:disabled{opacity:.55;cursor:wait}
 .summary{display:flex;gap:12px;flex-wrap:wrap;color:#d2e8e4;margin:16px 0}
 .summary span{padding:8px 12px;border:1px solid #2a535c;border-radius:10px}
-table{width:100%;border-collapse:collapse;min-width:950px}th,td{padding:12px;border-bottom:1px solid #25404a;text-align:left;vertical-align:top;font-size:12px}
+table{width:100%;border-collapse:collapse;min-width:950px}#signed-candidates{min-width:750px}#signed-candidates code{overflow-wrap:anywhere;word-break:break-word}th,td{padding:12px;border-bottom:1px solid #25404a;text-align:left;vertical-align:top;font-size:12px}
 th{color:#a8c4c5;font-size:11px;letter-spacing:.04em}td small{display:block;color:#9aaeb1;margin-top:5px}
 .scroll{overflow:auto}.boundary{border-left:3px solid #f5d47d;padding:12px;color:#dccdb4;background:#26251b;border-radius:5px}
 #status{min-height:22px}code{font-size:12px;color:#c5e2e1}
@@ -35,6 +35,12 @@ th{color:#a8c4c5;font-size:11px;letter-spacing:.04em}td small{display:block;colo
 <p id="status" class="muted" role="status" aria-live="polite">No data loaded.</p>
 <div id="summary" class="summary"></div>
 <div class="scroll"><table><thead><tr><th>Incident</th><th>Severity / status</th><th>Age / updated</th><th>Assignment label</th><th>Escalation audit state</th><th>Owner review record</th><th>Review attention (not SLA)</th><th>Evidence refs</th></tr></thead><tbody id="cases"></tbody></table></div>
+</section>
+<section class="panel" aria-labelledby="signed-decisions-heading">
+<h2 id="signed-decisions-heading">Authenticated ARVIS decisions for owner review</h2>
+<p class="boundary">Read-only verified signed verdicts are NOT SOC incidents, containment decisions or an automatic severity assessment. Each case must be created or linked explicitly through the existing authenticated owner incident workflow.</p>
+<p id="signed-decision-status" role="status" aria-live="polite">Signed receipt candidates: unverified.</p>
+<div class="scroll"><table id="signed-candidates"><thead><tr><th>Recorded</th><th>Network / target</th><th>Authenticated final</th><th>Owner case</th><th>Copy-ready signed SOC evidence reference</th></tr></thead><tbody id="signed-decision-rows"></tbody></table></div>
 </section><p class="muted">Only the latest 100 cases in this view. Empty, unavailable and incomplete data are never interpreted as a safe chain or a healthy SOC.</p>
 </main>
 <script>
@@ -46,6 +52,8 @@ var body=document.getElementById("cases");
 var summary=document.getElementById("summary");
 var refresh=document.getElementById("refresh");
 var filter=document.getElementById("case-status");
+var signedStatus=document.getElementById("signed-decision-status");
+var signedRows=document.getElementById("signed-decision-rows");
 function label(v){return typeof v==="string" && v.trim()?v:"Unknown";}
 function text(tag,value){var el=document.createElement(tag);el.textContent=value;return el;}
 function cell(row,value,sub){
@@ -109,6 +117,43 @@ function render(data){
  }
  status.textContent="Read-only snapshot · "+label(data.as_of)+" · "+data.items.length+" returned cases.";
 }
+async function loadCandidates(){
+ signedRows.replaceChildren();
+ signedStatus.textContent="Reading independently authenticated decision candidates...";
+ try{
+   var response=await fetch("/api/owner/soc/verdict-candidates",{method:"GET",credentials:"same-origin",cache:"no-store",headers:{"Accept":"application/json"}});
+   if(!response.ok){throw new Error("Trusted candidate proof unavailable (HTTP "+response.status+")");}
+   var data=await response.json();
+   if(data.ok!==true||!Array.isArray(data.items)||data.schema_version!=="koschei.owner-soc-signed-candidates.v1"){throw new Error("Candidate schema was not validated");}
+   for(var candidate of data.items){
+     if(!candidate||typeof candidate.evidence_ref!=="string"||!candidate.evidence_ref.startsWith("unified-verdict-ledger:")){throw new Error("Candidate evidence contract invalid");}
+   }
+   signedStatus.textContent=data.items.length+" independently verified signed finals in the bounded recent sample. A decision is not a SOC case.";
+   if(!data.items.length){
+     signedRows.appendChild(text("tr","No signed token decisions in the verified sample. This does not prove that the whole ledger is empty."));
+     return;
+   }
+   for(var item of data.items){
+     var tr=document.createElement("tr");
+     cell(tr,label(item.recorded_at));
+     cell(tr,label(item.network),label(item.target));
+     cell(tr,label(item.grade),label(item.verdict));
+     cell(tr,item.linked_to_soc===true?"Linked to Owner SOC":"Owner review required","No autonomous action");
+     var td=document.createElement("td"),ref=text("code",item.evidence_ref),copy=text("button","Copy reference");
+     copy.type="button";
+     (function(value){
+       copy.addEventListener("click",async function(){
+         try{await navigator.clipboard.writeText(value);signedStatus.textContent="Signed evidence reference copied. Owner action is still required.";}
+         catch(_){signedStatus.textContent="Clipboard unavailable. Select the displayed reference manually.";}
+       });
+     })(item.evidence_ref);
+     td.appendChild(ref);td.appendChild(document.createElement("br"));td.appendChild(copy);tr.appendChild(td);signedRows.appendChild(tr);
+   }
+ }catch(e){
+   signedRows.replaceChildren();
+   signedStatus.textContent="Signed ARVIS candidates UNVERIFIED / UNAVAILABLE. No pending cases or safe verdicts may be inferred.";
+ }
+}
 async function loadReadiness(){
  readiness.textContent="SOC storage: verifying read path...";
  try{
@@ -118,10 +163,13 @@ async function loadReadiness(){
    if(data.ok!==true||!data.readiness){throw new Error("unverified read response");}
    var snapshot=data.readiness;
    var operations=snapshot.operations;
+   var receipts=snapshot.signed_verdict_receipts;
+   if(!receipts||typeof receipts.state!=="string"){throw new Error("Missing receipt proof status");}
    readiness.textContent="Operations primary storage: "+(operations?label(operations.state):"UNVERIFIED")+" · Legacy SOC storage: "+label(snapshot.state)+
      " · sampled cases: "+(Number.isInteger(snapshot.sampled_cases)?String(snapshot.sampled_cases):"unknown")+
      " · audited actions observed: "+(snapshot.any_audited_actions===true?"yes":"no")+
      " · cases linked to audit rows: "+(Number.isInteger(snapshot.linked_audit_case_samples)?String(snapshot.linked_audit_case_samples):"unknown")+
+     " · Signed ARVIS receipts: "+label(receipts.state)+" ("+String(receipts.verified_receipts||0)+"/"+String(receipts.sampled_receipts||0)+")"+
      " · NOT end-to-end accepted";
  }catch(err){
    readiness.textContent="SOC storage: UNAVAILABLE / NOT VERIFIED. No healthy state can be inferred.";
@@ -141,7 +189,7 @@ async function load(){
  }catch(err){status.textContent=String(err&&err.message||"Queue unavailable")+" No empty/healthy state is inferred.";}
  finally{refresh.disabled=false;}
 }
-refresh.addEventListener("click",function(){loadReadiness();load();});filter.addEventListener("change",load);loadReadiness();load();
+refresh.addEventListener("click",function(){loadReadiness();loadCandidates();load();});filter.addEventListener("change",load);loadReadiness();loadCandidates();load();
 })();
 </script></body></html>`
 
