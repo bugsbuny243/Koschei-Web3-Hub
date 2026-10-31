@@ -28,8 +28,8 @@ const ownerSOCReceiptProbeBoundary = "A bounded historical signature sample does
 
 func probeOwnerSOCSignedReceipts(ctx context.Context, db *sql.DB) ownerSOCSignedReceiptProbe {
 	probe := ownerSOCSignedReceiptProbe{
-		State: "unavailable_not_accepted",
-		Scope: ownerSOCReceiptProbeScope,
+		State:    "unavailable_not_accepted",
+		Scope:    ownerSOCReceiptProbeScope,
 		Boundary: ownerSOCReceiptProbeBoundary,
 	}
 	if db == nil {
@@ -57,7 +57,7 @@ func probeOwnerSOCSignedReceipts(ctx context.Context, db *sql.DB) ownerSOCSigned
 	probe.LedgerTableReadable = true
 	type receipt struct {
 		network, kind, target, signature, algorithm, keyID, payloadHash string
-		bytes []byte
+		bytes                                                           []byte
 	}
 	entries := make([]receipt, 0, ownerSOCSignedReceiptProbeLimit)
 	for rows.Next() {
@@ -104,4 +104,3 @@ func probeOwnerSOCSignedReceipts(ctx context.Context, db *sql.DB) ownerSOCSigned
 	probe.State = "bounded_historical_signatures_verified_not_end_to_end_accepted"
 	return probe
 }
-
