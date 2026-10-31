@@ -22,6 +22,7 @@ func customerCanonicalMatchingReceipt(
 	}
 	for _, record := range history {
 		if strings.TrimSpace(record.ID) == "" ||
+			strings.TrimSpace(record.LedgerID) == "" ||
 			strings.TrimSpace(record.Fingerprint) == "" ||
 			!record.Signed ||
 			record.Network != final.Network ||
