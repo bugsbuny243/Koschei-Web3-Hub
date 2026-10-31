@@ -1,0 +1,32 @@
+name: Temporary exact gofmt for immutable SOC receipts
+on:
+  push:
+    branches: [fix/soc-immutable-verdict-receipts-20261031]
+permissions:
+  contents: write
+jobs:
+  formatter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Format only changed Go files and remove temporary workflow
+        run: |
+          set -euo pipefail
+          gofmt -w \
+            koschei/api/internal/services/unified_radar_store.go \
+            koschei/api/internal/services/unified_radar_receipt_ledger.go \
+            koschei/api/internal/services/unified_radar_receipt_ledger_test.go \
+            koschei/api/internal/handlers/owner_incidents.go \
+            koschei/api/internal/handlers/owner_incident_immutable_verdict_ref.go \
+            koschei/api/internal/handlers/owner_incident_immutable_verdict_ref_postgres_test.go \
+            koschei/api/internal/handlers/customer_canonical_receipt.go \
+            koschei/api/internal/handlers/customer_canonical_receipt_test.go \
+            koschei/api/internal/handlers/security_radar.go
+          git config user.name 'koschei-ci-formatter'
+          git config user.email 'actions@users.noreply.github.com'
+          git rm .github/workflows/temp-immutable-soc-gofmt.yml
+          git add koschei/api/internal/services koschei/api/internal/handlers
+          git commit -m 'style(go): apply canonical gofmt to immutable SOC receipts'
+          git push origin HEAD:fix/soc-immutable-verdict-receipts-20261031
