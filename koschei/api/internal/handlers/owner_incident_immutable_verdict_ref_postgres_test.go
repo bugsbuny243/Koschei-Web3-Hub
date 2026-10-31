@@ -56,6 +56,7 @@ func TestOwnerSOCImmutableCanonicalReceiptPostgres(t *testing.T) {
 		"123_security_center_incident_workflow.sql",
 		"137_soc_operations.sql",
 		"138_unified_verdict_immutable_receipts.sql",
+		"139_unified_verdict_receipt_recent_proof_index.sql",
 	} {
 		raw, err := os.ReadFile(filepath.Join("..", "..", "migrations", migration))
 		if err != nil {
