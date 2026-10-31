@@ -67,3 +67,9 @@ successful bounded list, choose a **genuinely applicable** signed receipt,
 create or link a real incident through the existing owner workflow, and read
 back the action timeline. A non-authenticated observer must never create a
 production fixture or claim live case acceptance from stored counts alone.
+
+## Release artifact parity
+
+The new owner-only read route is listed in `productionRouteInventory`
+**and** the generated `openapi.yaml`. The release acceptance job rejects
+route-inventory drift and stale OpenAPI output; neither check is optional.
