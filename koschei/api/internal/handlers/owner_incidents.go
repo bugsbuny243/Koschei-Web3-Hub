@@ -415,6 +415,9 @@ func incidentEvidenceSource(ctx context.Context, tx *sql.Tx, ref, network, targe
 	if tx == nil || ref == "" {
 		return "", nil
 	}
+	if strings.HasPrefix(ref, immutableSOCVerdictRefPrefix) {
+		return resolveImmutableSOCVerdictReference(ctx, tx, ref, network, target)
+	}
 	if strings.HasPrefix(ref, unifiedSOCVerdictRefPrefix) {
 		return resolveUnifiedSOCVerdictReference(ctx, tx, ref, network, target)
 	}

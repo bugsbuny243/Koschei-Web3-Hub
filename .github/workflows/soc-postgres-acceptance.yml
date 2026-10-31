@@ -90,6 +90,22 @@ jobs:
             echo 'SOC PostgreSQL acceptance unexpectedly skipped a test'
             exit 1
           fi
+      - name: Verify immutable signed verdict receipts with real PostgreSQL and SOC owner linkage
+        env:
+          KOSCHEI_TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/koschei_soc_acceptance?sslmode=disable
+        run: |
+          set -euo pipefail
+          logfile="${RUNNER_TEMP}/soc-immutable-verdict-acceptance.log"
+          go test -v ./internal/handlers \
+            -run '^(TestOwnerSOCImmutableCanonicalReceiptPostgres|TestOwnerSOCLinksScopedCustomerSignedVerdictPostgres)$' \
+            -count=1 2>&1 | tee "$logfile"
+          for name in TestOwnerSOCImmutableCanonicalReceiptPostgres TestOwnerSOCLinksScopedCustomerSignedVerdictPostgres; do
+            grep -Fq -- "--- PASS: $name (" "$logfile"
+          done
+          if grep -Fq -- '--- SKIP:' "$logfile"; then
+            echo 'Immutable SOC acceptance unexpectedly skipped a PostgreSQL test'
+            exit 1
+          fi
       - name: Verify registered SOC owner HTTP authorization against isolated PostgreSQL
         env:
           KOSCHEI_TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/koschei_soc_acceptance?sslmode=disable
