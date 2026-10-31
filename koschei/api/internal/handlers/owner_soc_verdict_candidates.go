@@ -98,7 +98,7 @@ func (h *Handler) OwnerSOCVerdictCandidates(w http.ResponseWriter, r *http.Reque
 		items = append(items, ownerSOCVerdictCandidate{
 			Network: network, Target: target, Grade: signed.Grade, Verdict: signed.Verdict,
 			EvidenceRef: immutableSOCVerdictRefPrefix + id + ":" + signature,
-			RecordedAt: recordedAt, Linked: linked,
+			RecordedAt:  recordedAt, Linked: linked,
 		})
 	}
 	if err := rows.Err(); err != nil {
@@ -106,11 +106,11 @@ func (h *Handler) OwnerSOCVerdictCandidates(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"ok": true,
+		"ok":             true,
 		"schema_version": "koschei.owner-soc-signed-candidates.v1",
-		"boundary": ownerSOCVerdictCandidateBoundary,
-		"limit": ownerSOCVerdictCandidateLimit,
-		"count": len(items),
-		"items": items,
+		"boundary":       ownerSOCVerdictCandidateBoundary,
+		"limit":          ownerSOCVerdictCandidateLimit,
+		"count":          len(items),
+		"items":          items,
 	})
 }
