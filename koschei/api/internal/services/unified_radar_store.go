@@ -13,6 +13,7 @@ import (
 
 type UnifiedRadarVerdictHistoryRecord struct {
 	ID                  string                `json:"id"`
+	LedgerID            string                `json:"ledger_id,omitempty"`
 	Network             string                `json:"network"`
 	TargetKind          string                `json:"target_kind"`
 	TargetID            string                `json:"target_id"`
@@ -55,6 +56,18 @@ func (s *UnifiedRadarVerdictStore) Persist(ctx context.Context, network, targetK
 		return UnifiedRadarVerdictHistoryRecord{}, fmt.Errorf("unified radar target is required")
 	}
 	verdict = FinalizeUnifiedRadarVerdictContractForNetwork(targetID, network, verdict)
+	var signedPayload []byte
+	if verdict.Signed {
+		// A claimed signed flag is not sufficient to create an immutable receipt.
+		if err := VerifyUnifiedRadarVerdictWithCurrentSigner(verdict); err != nil {
+			return UnifiedRadarVerdictHistoryRecord{}, fmt.Errorf("verify immutable verdict before persistence: %w", err)
+		}
+		var err error
+		signedPayload, err = unifiedVerdictSigningBytesV1(verdict)
+		if err != nil {
+			return UnifiedRadarVerdictHistoryRecord{}, err
+		}
+	}
 	fingerprint, err := UnifiedRadarVerdictFingerprint(network, targetKind, targetID, verdict, behavior)
 	if err != nil {
 		return UnifiedRadarVerdictHistoryRecord{}, err
@@ -79,9 +92,14 @@ func (s *UnifiedRadarVerdictStore) Persist(ctx context.Context, network, targetK
 	if generatedAt.IsZero() {
 		generatedAt = time.Now().UTC()
 	}
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return UnifiedRadarVerdictHistoryRecord{}, fmt.Errorf("begin verdict persistence: %w", err)
+	}
+	defer tx.Rollback()
 	var record UnifiedRadarVerdictHistoryRecord
 	var triggeredRaw, watchRaw, decisionRaw, signalsRaw []byte
-	err = s.DB.QueryRowContext(ctx, `
+	err = tx.QueryRowContext(ctx, `
 		INSERT INTO security_unified_radar_verdicts (
 			network,target_kind,target_id,grade,verdict,ruleset_version,actor_ruleset_version,
 			digest,signed,signature,signature_algorithm,key_id,payload_hash,fingerprint,
@@ -127,6 +145,15 @@ func (s *UnifiedRadarVerdictStore) Persist(ctx context.Context, network, targetK
 	if err != nil {
 		return UnifiedRadarVerdictHistoryRecord{}, err
 	}
+	if verdict.Signed {
+		record.LedgerID, err = insertUnifiedSignedReceiptTx(ctx, tx, record, signedPayload)
+		if err != nil {
+			return UnifiedRadarVerdictHistoryRecord{}, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return UnifiedRadarVerdictHistoryRecord{}, fmt.Errorf("commit signed verdict receipt and projection: %w", err)
+	}
 	_ = json.Unmarshal(triggeredRaw, &record.TriggeredRules)
 	_ = json.Unmarshal(watchRaw, &record.WatchFlags)
 	_ = json.Unmarshal(decisionRaw, &record.DecisionPath)
@@ -150,10 +177,13 @@ func (s *UnifiedRadarVerdictStore) History(ctx context.Context, network, targetK
 		       actor_ruleset_version,COALESCE(digest,''),signed,COALESCE(signature,''),
 		       COALESCE(signature_algorithm,''),COALESCE(key_id,''),COALESCE(payload_hash,''),fingerprint,
 		       triggered_rules,watch_flags,decision_path,behavior_signals,
-		       first_seen_at,last_seen_at,scan_count
-		FROM security_unified_radar_verdicts
-		WHERE network=$1 AND target_kind=$2 AND target_id=$3
-		ORDER BY last_seen_at DESC,id DESC
+		       v.first_seen_at,v.last_seen_at,v.scan_count,COALESCE(receipt.id::text,'')
+		FROM security_unified_radar_verdicts v
+		LEFT JOIN security_unified_verdict_receipts receipt
+		  ON receipt.signature=v.signature AND receipt.payload_hash=v.payload_hash
+		 AND receipt.network=v.network AND receipt.target_kind=v.target_kind AND receipt.target_id=v.target_id
+		WHERE v.network=$1 AND v.target_kind=$2 AND v.target_id=$3
+		ORDER BY v.last_seen_at DESC,v.id DESC
 		LIMIT $4`, normalizeRadarNetwork(network), strings.TrimSpace(targetKind), strings.TrimSpace(targetID), limit)
 	if err != nil {
 		return nil, err
@@ -168,7 +198,7 @@ func (s *UnifiedRadarVerdictStore) History(ctx context.Context, network, targetK
 			&record.Verdict, &record.RulesetVersion, &record.ActorRulesetVersion, &record.Digest,
 			&record.Signed, &record.Signature, &record.SignatureAlgorithm, &record.KeyID, &record.PayloadHash,
 			&record.Fingerprint, &triggeredRaw, &watchRaw, &decisionRaw, &signalsRaw,
-			&record.FirstSeenAt, &record.LastSeenAt, &record.ScanCount,
+			&record.FirstSeenAt, &record.LastSeenAt, &record.ScanCount, &record.LedgerID,
 		); err != nil {
 			return nil, err
 		}
