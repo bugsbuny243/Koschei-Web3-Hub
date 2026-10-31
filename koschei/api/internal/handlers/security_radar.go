@@ -169,10 +169,10 @@ func (h *Handler) SecurityRadarCheck(w http.ResponseWriter, r *http.Request) {
 			))
 		} else {
 			receipt = map[string]any{
-				"id": stored.ID, "fingerprint": stored.Fingerprint,
+				"id": stored.ID, "ledger_id": stored.LedgerID, "fingerprint": stored.Fingerprint,
 				"signature": stored.Signature, "payload_hash": stored.PayloadHash,
 				"key_id": stored.KeyID, "rule_version": stored.RulesetVersion,
-				"soc_evidence_ref": unifiedSOCVerdictRefPrefix + stored.ID + ":" + stored.Signature,
+				"soc_evidence_ref": immutableSOCVerdictRefPrefix + stored.LedgerID + ":" + stored.Signature,
 			}
 			if err := h.consumePremiumOutput(claims.Sub, claimEmail, "security_radar_check"); err != nil {
 				writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
