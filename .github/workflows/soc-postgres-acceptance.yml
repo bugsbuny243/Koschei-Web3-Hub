@@ -57,6 +57,16 @@ jobs:
             printf '%s\n' "$unformatted"
             exit 1
           fi
+      - name: Validate embedded Owner SOC triage JavaScript syntax
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          source = Path("internal/http/owner_soc_triage_page.go").read_text()
+          start = source.index("<script>") + len("<script>")
+          end = source.index("</script>", start)
+          Path("/tmp/koschei-owner-soc-triage.js").write_text(source[start:end])
+          PY
+          node --check /tmp/koschei-owner-soc-triage.js
       - name: Apply existing PostgreSQL schema migrations to ephemeral test database
         env:
           PGPASSWORD: postgres
