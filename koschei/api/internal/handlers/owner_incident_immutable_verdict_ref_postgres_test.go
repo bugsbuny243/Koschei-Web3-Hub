@@ -109,6 +109,27 @@ func TestOwnerSOCImmutableCanonicalReceiptPostgres(t *testing.T) {
 	}
 	ref := immutableSOCVerdictRefPrefix + record.LedgerID + ":" + record.Signature
 	h := &Handler{DB: db, DBRead: db}
+	candidateRead := func() (int, []ownerSOCVerdictCandidate) {
+		t.Helper()
+		w := httptest.NewRecorder()
+		h.OwnerSOCVerdictCandidates(w, httptest.NewRequest(http.MethodGet, "/api/owner/soc/verdict-candidates", nil))
+		var result struct {
+			Items []ownerSOCVerdictCandidate `json:"items"`
+		}
+		if w.Code == http.StatusOK {
+			if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+				t.Fatal(err)
+			}
+			if w.Header().Get("Cache-Control") != "no-store" {
+				t.Fatal("SOC signed candidate response is cacheable")
+			}
+		}
+		return w.Code, result.Items
+	}
+	if status, items := candidateRead(); status != http.StatusOK || len(items) != 1 ||
+		items[0].Linked || items[0].EvidenceRef != ref || items[0].Target != final.Target {
+		t.Fatalf("signed unlinked candidate not offered: status=%d items=%+v", status, items)
+	}
 	postCreate := func(network, target, evidence string) *httptest.ResponseRecorder {
 		t.Helper()
 		body, _ := json.Marshal(map[string]any{
@@ -135,6 +156,9 @@ func TestOwnerSOCImmutableCanonicalReceiptPostgres(t *testing.T) {
 	}
 
 	t.Setenv("KOSCHEI_ARVIS_STREAM_TRUSTED_VERDICT_KEYS_JSON", "")
+	if status, _ := candidateRead(); status != http.StatusServiceUnavailable {
+		t.Fatalf("untrusted candidate list returned HTTP %d", status)
+	}
 	if probe := probeOwnerSOCSignedReceipts(context.Background(), db); probe.State != "not_accepted_independent_trust_unavailable" ||
 		probe.VerifiedReceipts != 0 || probe.IndependentTrustLoaded {
 		t.Fatalf("missing independent keys claimed verified signatures: %+v", probe)
@@ -150,6 +174,10 @@ func TestOwnerSOCImmutableCanonicalReceiptPostgres(t *testing.T) {
 		if w.Code != http.StatusCreated {
 			t.Fatalf("verified immutable owner evidence rejected: %d %s", w.Code, w.Body.String())
 		}
+	}
+
+	if status, items := candidateRead(); status != http.StatusOK || len(items) != 1 || !items[0].Linked {
+		t.Fatalf("owner case did not link verified candidate: status=%d items=%+v", status, items)
 	}
 	// A later mutation of the mutable fingerprint projection must NOT destroy
 	// the older signature's immutable decision identity.
@@ -185,6 +213,10 @@ func TestOwnerSOCImmutableCanonicalReceiptPostgres(t *testing.T) {
 		FROM security_unified_verdict_receipts WHERE id=$1::uuid
 	`, record.LedgerID); err != nil {
 		t.Fatalf("failed to insert deliberately untrusted test-only receipt: %v", err)
+	}
+
+	if status, _ := candidateRead(); status != http.StatusServiceUnavailable {
+		t.Fatalf("forged database signature was listed as a candidate: status=%d", status)
 	}
 	if probe := probeOwnerSOCSignedReceipts(context.Background(), db); probe.State != "not_accepted_immutable_receipt_integrity_failure" ||
 		probe.VerifiedReceipts == probe.SampledReceipts {
