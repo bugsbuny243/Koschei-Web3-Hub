@@ -21,7 +21,7 @@ func TestCustomerCanonicalReceiptGateRequiresExactDurableSignedFinal(t *testing.
 		t.Fatalf("test signer unavailable: %#v", final)
 	}
 	record := services.UnifiedRadarVerdictHistoryRecord{
-		ID:      "saved-unified-verdict-1", LedgerID: "immutable-ledger-1",
+		ID: "saved-unified-verdict-1", LedgerID: "immutable-ledger-1",
 		Network: final.Network, TargetKind: "token", TargetID: final.Target,
 		Grade: final.Grade, Verdict: final.Verdict, RulesetVersion: final.RulesetVersion,
 		ActorRulesetVersion: final.ActorRuleset, Digest: final.Digest, Signed: final.Signed,

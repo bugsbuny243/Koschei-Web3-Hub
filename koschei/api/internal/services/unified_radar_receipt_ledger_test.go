@@ -14,7 +14,7 @@ func TestImmutableSignedReceiptIndependentHistoricalVerification(t *testing.T) {
 	t.Setenv(unifiedVerdictSigningPrivateKeyEnv, base64.RawURLEncoding.EncodeToString(private))
 	final := FinalizeUnifiedRadarVerdictContractForNetwork("MintLedger", "solana-mainnet", UnifiedRadarVerdict{
 		RulesetVersion: UnifiedRadarRulesetVersion,
-		ActorRuleset: ActorDefenseRulesetVersion,
+		ActorRuleset:   ActorDefenseRulesetVersion,
 		TriggeredRules: []ActorDefenseRuleHit{{
 			RuleID: ActorRuleCompoundCreatorReuse, Tier: "compounding",
 			EvidenceStatus: "verified", Summary: "creator evidence",
@@ -28,7 +28,7 @@ func TestImmutableSignedReceiptIndependentHistoricalVerification(t *testing.T) {
 		t.Fatal(err)
 	}
 	registry, err := NewGlobalRadarTrustedVerdictRegistry([]GlobalRadarTrustedVerdictKey{{
-		KeyID: final.KeyID,
+		KeyID:              final.KeyID,
 		PublicKeyBase64URL: base64.RawURLEncoding.EncodeToString(private.Public().(ed25519.PublicKey)),
 	}})
 	if err != nil {

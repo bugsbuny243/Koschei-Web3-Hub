@@ -76,10 +76,10 @@ func TestOwnerSOCImmutableCanonicalReceiptPostgres(t *testing.T) {
 	t.Setenv("KOSCHEI_ARVIS_STREAM_TRUSTED_VERDICT_KEYS_JSON", string(keys))
 	final := services.FinalizeUnifiedRadarVerdictContractForNetwork("MintImmutableSOC", "solana-mainnet", services.UnifiedRadarVerdict{
 		RulesetVersion: services.UnifiedRadarRulesetVersion,
-		ActorRuleset: services.ActorDefenseRulesetVersion,
+		ActorRuleset:   services.ActorDefenseRulesetVersion,
 		TriggeredRules: []services.ActorDefenseRuleHit{{
 			RuleID: services.ActorRuleCompoundCreatorReuse,
-			Tier: "compounding", EvidenceStatus: "verified", Summary: "verified creator evidence",
+			Tier:   "compounding", EvidenceStatus: "verified", Summary: "verified creator evidence",
 		}},
 	})
 	if !final.Signed {
@@ -101,7 +101,7 @@ func TestOwnerSOCImmutableCanonicalReceiptPostgres(t *testing.T) {
 		body, _ := json.Marshal(map[string]any{
 			"title": "Immutable signed receipt review", "severity": "medium",
 			"network": network, "target": target,
-			"summary": "Owner manually linked cryptographically verified immutable receipt",
+			"summary":       "Owner manually linked cryptographically verified immutable receipt",
 			"evidence_refs": []string{evidence},
 		})
 		w := httptest.NewRecorder()
@@ -109,8 +109,8 @@ func TestOwnerSOCImmutableCanonicalReceiptPostgres(t *testing.T) {
 		return w
 	}
 	for name, invalid := range map[string][3]string{
-		"wrong network": {"solana-devnet", final.Target, ref},
-		"wrong target": {final.Network, "DifferentMint", ref},
+		"wrong network":   {"solana-devnet", final.Target, ref},
+		"wrong target":    {final.Network, "DifferentMint", ref},
 		"wrong signature": {final.Network, final.Target, ref[:len(ref)-1] + alternateSignatureSuffix(record.Signature)},
 	} {
 		t.Run(name, func(t *testing.T) {
