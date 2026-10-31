@@ -59,3 +59,11 @@ was missing/invalid. No connected bucket or durable volume had been
 identified in the Railway project. Do not enable unsafe pruning, invent
 credentials or use ephemeral filesystem for audit evidence. A durable,
 verified S3-compatible destination and restore proof are required.
+
+## Operator acceptance checklist after rollout
+
+An authenticated owner must confirm that the candidate endpoint returns a
+successful bounded list, choose a **genuinely applicable** signed receipt,
+create or link a real incident through the existing owner workflow, and read
+back the action timeline. A non-authenticated observer must never create a
+production fixture or claim live case acceptance from stored counts alone.
