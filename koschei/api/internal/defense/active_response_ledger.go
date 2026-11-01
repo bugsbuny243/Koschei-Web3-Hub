@@ -125,11 +125,11 @@ func BuildShadowLedgerEntry(
 	return entry, nil
 }
 
-// RecordShadowLedger persists the planned action exactly once per tenant and
+// recordShadowLedger persists the planned action exactly once per tenant and
 // action ID. It requires the separate, manually installed staging SQL schema:
 // docs/security-center/ACTIVE_RESPONSE_LEDGER_STAGING_V1.sql.
 // It is NOT invoked by any production route, worker or start-up function.
-func RecordShadowLedger(
+func recordShadowLedger(
 	ctx context.Context,
 	db *sql.DB,
 	plan ActiveResponsePlan,
