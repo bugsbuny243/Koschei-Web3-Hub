@@ -48,6 +48,7 @@ jobs:
           import os
           from pathlib import Path
           from google import genai
+          from google.genai import errors
 
           prompt = (
               "Produce a concise security review CHECKLIST, not findings, for "
@@ -58,12 +59,22 @@ jobs:
               "checks. You are not given code: explicitly state that no repository "
               "inspection or vulnerability verification was performed."
           )
-          # Keep the underlying HTTP client alive for the entire API request.
-          with genai.Client(api_key=os.environ["GEMINI_API_KEY"]) as client:
-              result = client.models.generate_content(
-                  model="gemini-3.8-flash",
-                  contents=prompt,
-              )
+          # This is a non-authoritative advisory. Provider saturation should
+          # be visibly reported as unavailable, never as a completed review.
+          try:
+              with genai.Client(api_key=os.environ["GEMINI_API_KEY"]) as client:
+                  result = client.models.generate_content(
+                      model="gemini-3.8-flash",
+                      contents=prompt,
+                  )
+          except errors.ServerError as exc:
+              if "503 UNAVAILABLE" not in str(exc):
+                  raise
+              message = "Gemini advisory unavailable (provider 503); no model review was performed."
+              print("::notice::" + message)
+              with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a", encoding="utf-8") as output:
+                  output.write(message + "\n")
+              raise SystemExit(0)
           answer = (result.text or "").strip()
           if not answer:
               raise RuntimeError("Gemini returned an empty checklist")
