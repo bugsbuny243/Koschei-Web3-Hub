@@ -1,0 +1,29 @@
+name: Public SOC Social Draft Safety
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/social-draft-generator.cjs'
+      - 'scripts/social-draft-generator.test.cjs'
+      - 'docs/SOCIAL_PUBLIC_CASE_DRAFTS_V1.md'
+      - '.github/workflows/public-soc-social-drafts.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-draft:
+    name: Verify offline X and Discord review-only drafts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Run fail-closed editorial draft tests
+        run: node --test scripts/social-draft-generator.test.cjs
+      - name: Confirm no social-network credentials or post endpoints were added
+        run: |
+          set -euo pipefail
+          ! grep -E 'api\.twitter\.com|api\.x\.com|discord\.com/api/webhooks|TWITTER_BEARER_TOKEN|DISCORD_WEBHOOK_URL|STRIPE_SECRET_KEY|SHOPIER_' scripts/social-draft-generator.cjs
+          echo 'PASS: no configured social publishers or payment secrets'
