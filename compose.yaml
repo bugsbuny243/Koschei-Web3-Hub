@@ -1,0 +1,38 @@
+name: koschei-local
+
+# Local, stateless smoke environment only. No payment providers, database
+# connection strings, live workers, secrets or package entitlements are wired.
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "127.0.0.1:${KOSCHEI_LOCAL_PORT:-8080}:8080"
+    environment:
+      APP_ENV: development
+      PORT: "8080"
+      KOSCHEI_RUNTIME_ROLE: api
+      CACHE_ENABLED: "false"
+      KOSCHEI_AUTOMATIC_SCANNING_ENABLED: "false"
+      KOSCHEI_OWNER_UNLIMITED_AUTOSCAN_ENABLED: "false"
+      KOSCHEI_AUTO_RADAR_ENABLED: "0"
+      KOSCHEI_AUTO_RADAR_FORCE_BACKGROUND: "false"
+      RADAR_STREAM_ENABLED: "0"
+      PUMPPORTAL_ENABLED: "false"
+      WEB3_WORKER_ENABLED: "false"
+      KOSCHEI_X402_ENABLED: "false"
+      SOLANA_RPC_LIMIT_SAVER_ENABLED: "true"
+      SOLANA_RPC_GOVERNOR_ENABLED: "true"
+      SOLANA_RPC_MAX_429_RETRIES: "0"
+      AI_ENABLED: "false"
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
+    restart: "no"
