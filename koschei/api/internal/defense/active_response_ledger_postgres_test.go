@@ -123,6 +123,25 @@ func TestActiveResponsePostgresStagingLedgerAcceptance(t *testing.T) {
 	if err != nil || check.Status != "verified" || check.ExecutionPerformed {
 		t.Fatalf("persisted shadow ledger chain invalid: %+v %v", check, err)
 	}
+	receipt, err := InspectShadowLedgerReceipt(ctx, db,
+		tenant, input.Request.ActionID, input.Request.TargetID,
+		input.Provider.ProviderID, first.PlanDigest)
+	if err != nil || receipt.Status != ActiveResponseReceiptPresent ||
+		receipt.ChainHash != first.ChainHash || receipt.ExecutionPerformed {
+		t.Fatalf("consistent committed shadow receipt not found: %+v %v", receipt, err)
+	}
+	absent, err := InspectShadowLedgerReceipt(ctx, db,
+		tenant, "missing-shadow-action", input.Request.TargetID,
+		input.Provider.ProviderID, first.PlanDigest)
+	if err != nil || absent.Status != ActiveResponseReceiptAbsent || absent.ExecutionPerformed {
+		t.Fatalf("absent shadow record must remain unconfirmed: %+v %v", absent, err)
+	}
+	conflict, err := InspectShadowLedgerReceipt(ctx, db,
+		tenant, input.Request.ActionID, input.Request.TargetID,
+		"wrong-provider", first.PlanDigest)
+	if err == nil || conflict.Status != ActiveResponseReceiptUnknown {
+		t.Fatalf("conflicting shadow receipt accepted: %+v %v", conflict, err)
+	}
 }
 
 func resignShadowLedgerFixture(t *testing.T, input *TrustedShadowLedgerInputs, now time.Time) {
