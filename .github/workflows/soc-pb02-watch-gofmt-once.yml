@@ -1,0 +1,30 @@
+name: SOC PB02 Watch GoFmt One Shot
+on:
+  push:
+    branches:
+      - feat/soc-pb02-bounded-live-authority-watch-20261101
+    paths:
+      - .github/workflows/soc-pb02-watch-gofmt-once.yml
+permissions:
+  contents: write
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: true
+      - name: Format only PB02 watch Go files
+        shell: bash
+        run: |
+          set -euo pipefail
+          gofmt -w koschei/api/internal/services/soc_pb02_authority_watch.go koschei/api/internal/services/soc_pb02_authority_watch_test.go
+          if ! git diff --quiet -- koschei/api/internal/services/soc_pb02_authority_watch.go koschei/api/internal/services/soc_pb02_authority_watch_test.go; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add -- koschei/api/internal/services/soc_pb02_authority_watch.go koschei/api/internal/services/soc_pb02_authority_watch_test.go
+            git commit -m 'style(go): format bounded PB02 watch and acceptance tests'
+            git push origin HEAD:"${GITHUB_REF_NAME}"
+          fi
