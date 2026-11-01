@@ -3,6 +3,7 @@ package defense
 import (
 	"context"
 	"crypto/ed25519"
+	"database/sql"
 	"testing"
 	"time"
 )
@@ -97,5 +98,20 @@ func TestActiveResponseVerifiedLedgerNeverWritesWithoutStorage(t *testing.T) {
 	result, err := RecordVerifiedShadowLedger(context.Background(), nil, input, now)
 	if err == nil || result.ExecutionPerformed {
 		t.Fatalf("no storage must fail closed: %+v %v", result, err)
+	}
+}
+
+func TestActiveResponseVerifiedLedgerFailsClosedOnClosedDatabase(t *testing.T) {
+	db, err := sql.Open("postgres", "dbname=koschei_shadow_test sslmode=disable")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+	input, now := trustedShadowLedgerFixture(t)
+	result, err := RecordVerifiedShadowLedger(context.Background(), db, input, now)
+	if err == nil || result.ExecutionPerformed || result.Status != "" {
+		t.Fatalf("closed database must reject offline audit persistence: %+v %v", result, err)
 	}
 }
