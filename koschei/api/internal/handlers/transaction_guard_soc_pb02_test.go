@@ -43,9 +43,9 @@ func pb02Simulated() transactionFirewallAssessment {
 
 func TestSOCPreSignPB02DetectsDecodedSetAuthorityAndRevocation(t *testing.T) {
 	for _, tc := range []struct {
-		name string
-		authorityType byte
-		revoked bool
+		name              string
+		authorityType     byte
+		revoked           bool
 		finding, severity string
 	}{
 		{"mint_tokens", 0, false, "token_authority_mutation_proposed", "critical"},

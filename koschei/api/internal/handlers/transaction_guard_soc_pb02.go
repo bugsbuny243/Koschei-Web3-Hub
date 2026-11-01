@@ -44,17 +44,17 @@ func buildTransactionGuardSOCPlaybook02(
 	authority transactionGuardAuthoritySurfaceAnalysis,
 ) transactionGuardSOCPlaybook02 {
 	out := transactionGuardSOCPlaybook02{
-		SchemaVersion: transactionGuardSOCPlaybook02Version,
-		PlaybookID: "SOC-PB-02",
-		ExecutionState: "pre_sign_simulation_only",
-		EvidenceState: "incomplete",
-		FindingState: "withheld",
-		Severity: "unknown",
+		SchemaVersion:     transactionGuardSOCPlaybook02Version,
+		PlaybookID:        "SOC-PB-02",
+		ExecutionState:    "pre_sign_simulation_only",
+		EvidenceState:     "incomplete",
+		FindingState:      "withheld",
+		Severity:          "unknown",
 		RecommendedAction: "withhold_signature_until_evidence_complete",
-		EnforcementState: "signer_not_connected",
-		ReportIntegrity: "unsigned_preflight_observation",
-		Events: []transactionGuardSOCPlaybook02Event{},
-		ReasonCodes: []string{},
+		EnforcementState:  "signer_not_connected",
+		ReportIntegrity:   "unsigned_preflight_observation",
+		Events:            []transactionGuardSOCPlaybook02Event{},
+		ReasonCodes:       []string{},
 	}
 	complete := assessment.SimulationOK && decoded.Available && decoded.Complete &&
 		authority.Available && authority.Complete &&
