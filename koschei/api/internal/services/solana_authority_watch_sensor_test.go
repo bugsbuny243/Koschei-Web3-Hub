@@ -156,6 +156,7 @@ func TestAuthorityWatchPostgresAtomicCursorAndGap(t *testing.T) {
 	for _, stmt := range []string{
 		"CREATE TEMP TABLE security_solana_authority_watch_cursors (LIKE public.security_solana_authority_watch_cursors INCLUDING ALL)",
 		"CREATE TEMP TABLE security_solana_authority_watch_observations (LIKE public.security_solana_authority_watch_observations INCLUDING ALL)",
+		"CREATE TEMP TABLE security_alert_events (LIKE public.security_alert_events INCLUDING ALL)",
 	} {
 		if _, err := db.ExecContext(ctx, stmt); err != nil {
 			t.Fatal(err)
@@ -195,6 +196,11 @@ func TestAuthorityWatchPostgresAtomicCursorAndGap(t *testing.T) {
 		var gotSig, gotStatus string
 		if err := db.QueryRowContext(ctx, "SELECT watermark_signature,status FROM security_solana_authority_watch_cursors WHERE watch_address=$1", watch).Scan(&gotSig, &gotStatus); err != nil {
 			t.Fatal(err)
+		}
+		var alerts int
+		if err := db.QueryRowContext(ctx,"SELECT count(*) FROM security_alert_events WHERE source='solana_authority_watch'").Scan(&alerts);err!=nil {t.Fatal(err)}
+		if alerts!=1 {
+			t.Fatalf("high risk confirmed event did not create exactly one deduped owner SOC review alert: %d",alerts)
 		}
 		if recorded != count || gotSig != watermark || gotStatus != status {
 			t.Fatalf("false evidence or cursor: count=%d sig=%s status=%s", recorded, gotSig, gotStatus)
