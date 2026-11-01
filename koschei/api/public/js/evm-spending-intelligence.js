@@ -42,6 +42,18 @@ function authorityHTML(authority){
   ].filter(([,value])=>value!==undefined&&value!==null&&value!=='');
   return rows.map(([label,value],index)=>`<div class="esi-authority-row"><span>${String(index+1).padStart(2,'0')}</span><div><b>${esc(label)}</b><small title="${esc(value)}">${esc(short(value))}</small></div></div>`).join('');
 }
+function threatHTML(threat){
+  if(!threat||threat.playbook_id!=='SOC-PB-03')return '<div class="esi-empty">SOC-PB-03 observation unavailable. No benign finding inferred.</div>';
+  const reasons=Array.isArray(threat.reason_codes)?threat.reason_codes:[];
+  const rows=[
+    ['Evidence',threat.evidence_state],['Finding',threat.finding_state],
+    ['Exposure severity',threat.severity],['Recommended action',threat.recommended_action],
+    ['Enforcement',threat.enforcement_state],['Report integrity',threat.report_integrity]
+  ];
+  return '<div class="esi-reasons"><div class="esi-subhead"><span>SOC-PB-03 · allowance + spender control</span><b>READ ONLY · NOT A MALICIOUSNESS VERDICT</b></div>'+
+    rows.map(([name,value])=>'<div class="esi-authority-row"><span>'+esc(name)+'</span><div><b>'+esc(value||'unknown')+'</b></div></div>').join('')+
+    '<div>'+reasons.map(reason=>'<code>'+esc(reason)+'</code>').join('')+'</div></div>';
+}
 function render(payload){
   const data=payload?.result||{};
   const trust=data.trust||{};
@@ -63,6 +75,7 @@ function render(payload){
       <section><div class="esi-subhead"><span>Trust vector</span><b>Allowance observation only</b></div><div class="esi-trust">${trustCells(trust)}</div></section>
       <section><div class="esi-subhead"><span>Spender authority</span><b>Current authority surface</b></div><div class="esi-authority">${authorityHTML(authority)}</div></section>
     </div>
+    ${threatHTML(data.threat_assessment)}
     <div class="esi-reasons"><div class="esi-subhead"><span>Reason codes</span><b>${reasons.length} attached</b></div><div>${reasons.map(reason=>`<code>${esc(reason)}</code>`).join('')||'<span>No reason code attached.</span>'}</div></div>
     <p class="esi-foot">CURRENT ALLOWANCE ≠ APPROVAL PROVENANCE · APPROVAL ≠ SAFE SPENDER · SAME ADDRESS ≠ SAME CODE · NO ERC-1967 SLOT ≠ IMMUTABLE</p>`;
 }

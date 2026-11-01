@@ -7,6 +7,7 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -15,6 +16,30 @@ import (
 )
 
 const customerApprovalScanSchemaVersion = "koschei-approval-scan-v1"
+
+// The customer approval route has a read-only Ethereum fallback using the
+// existing configured Alchemy key. Provider and chain identity remain checked
+// by *every* ProbeEVM* call; an unsupported app key fails closed.
+// No RPC secret is ever included in a public response or a log.
+func customerApprovalRPCEndpoint(network string) string {
+	if endpoint := configuredEVMRPCEndpoint(network); endpoint != "" {
+		return endpoint
+	}
+	if network != "ethereum-mainnet" {
+		return ""
+	}
+	key := os.Getenv("ALCHEMY_API_KEY")
+	if len(key) == 0 || len(key) > 256 {
+		return ""
+	}
+	for _, char := range key {
+		if !(char >= 'a' && char <= 'z') && !(char >= 'A' && char <= 'Z') &&
+			!(char >= '0' && char <= '9') && char != '_' && char != '-' {
+			return ""
+		}
+	}
+	return "https://eth-mainnet.g.alchemy.com/v2/" + key
+}
 
 type customerApprovalScanRequest struct {
 	Network string `json:"network"`
@@ -36,6 +61,7 @@ type customerApprovalScanResult struct {
 	Reasons          []string                              `json:"reasons"`
 	SpenderAuthority *services.EVMSpenderAuthoritySnapshot `json:"spender_authority,omitempty"`
 	Exposure         customerApprovalExposure              `json:"exposure"`
+	ThreatAssessment services.SOCApprovalThreatAssessment  `json:"threat_assessment"`
 }
 
 type customerApprovalScanEnvelope struct {
@@ -85,6 +111,12 @@ func decodeCustomerApprovalScanRequest(r io.Reader) (customerApprovalScanRequest
 }
 
 func customerApprovalScan(w http.ResponseWriter, r *http.Request) {
+	customerApprovalScanWithRPCClient(w, r, nil)
+}
+
+// The production route uses the default verified HTTPS transport. Explicit
+// clients are confined to isolated TLS RPC integration tests.
+func customerApprovalScanWithRPCClient(w http.ResponseWriter, r *http.Request, client *http.Client) {
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
 	defer r.Body.Close()
 	mediaType, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
@@ -97,7 +129,7 @@ func customerApprovalScan(w http.ResponseWriter, r *http.Request) {
 		writeCustomerApprovalScanError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	endpoint := configuredEVMRPCEndpoint(request.Network)
+	endpoint := customerApprovalRPCEndpoint(request.Network)
 	if endpoint == "" {
 		writeCustomerApprovalScanError(w, http.StatusServiceUnavailable, "evm_rpc_configuration_required")
 		return
@@ -105,7 +137,7 @@ func customerApprovalScan(w http.ResponseWriter, r *http.Request) {
 
 	ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)
 	defer cancel()
-	allowance, err := networktarget.ProbeEVMAllowance(ctx, nil, endpoint, request.Network, request.Token, request.Owner, request.Spender)
+	allowance, err := networktarget.ProbeEVMAllowance(ctx, client, endpoint, request.Network, request.Token, request.Owner, request.Spender)
 	if err != nil {
 		writeCustomerApprovalScanError(w, http.StatusBadGateway, "evm_allowance_probe_unavailable")
 		return
@@ -137,14 +169,14 @@ func customerApprovalScan(w http.ResponseWriter, r *http.Request) {
 		writeCustomerApprovalScanResult(w, http.StatusOK, result)
 		return
 	}
-	codeProbe, codeErr := networktarget.ProbeEVM(ctx, nil, endpoint, resolution)
+	codeProbe, codeErr := networktarget.ProbeEVM(ctx, client, endpoint, resolution)
 	if codeErr != nil {
 		result.Reasons = services.NormalizeWeb3TrustReasons(append(result.Reasons, "SPENDER_AUTHORITY_UNAVAILABLE"))
 		result.Trust.Reasons = append([]string(nil), result.Reasons...)
 		writeCustomerApprovalScanResult(w, http.StatusOK, result)
 		return
 	}
-	proxyProbe, proxyErr := networktarget.ProbeEVMProxyAuthority(ctx, nil, endpoint, resolution)
+	proxyProbe, proxyErr := networktarget.ProbeEVMProxyAuthority(ctx, client, endpoint, resolution)
 	if proxyErr != nil {
 		result.Reasons = services.NormalizeWeb3TrustReasons(append(result.Reasons, "SPENDER_AUTHORITY_UNAVAILABLE"))
 		result.Trust.Reasons = append([]string(nil), result.Reasons...)
@@ -166,6 +198,14 @@ func customerApprovalScan(w http.ResponseWriter, r *http.Request) {
 }
 
 func writeCustomerApprovalScanResult(w http.ResponseWriter, status int, result customerApprovalScanResult) {
+	// This is the production /api/scan/approval output boundary: only live
+	// RPC-derived current allowance and authenticated spender authority may
+	// produce a SOC-PB-03 exposure observation. Missing authority => WITHHOLD.
+	result.ThreatAssessment = services.DetectSOCApprovalThreat(networktarget.EVMAllowanceProbeResult{
+		Network: result.Network, Token: result.Token, Owner: result.Owner,
+		Spender: result.Spender, Amount: result.Amount, Unlimited: result.Unlimited,
+		EvidenceStatus: result.EvidenceStatus, LiveAvailability: result.LiveAvailability,
+	}, result.SpenderAuthority)
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(status)
