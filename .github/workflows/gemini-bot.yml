@@ -58,10 +58,12 @@ jobs:
               "checks. You are not given code: explicitly state that no repository "
               "inspection or vulnerability verification was performed."
           )
-          result = genai.Client(api_key=os.environ["GEMINI_API_KEY"]).models.generate_content(
-              model="gemini-3.8-flash",
-              contents=prompt,
-          )
+          # Keep the underlying HTTP client alive for the entire API request.
+          with genai.Client(api_key=os.environ["GEMINI_API_KEY"]) as client:
+              result = client.models.generate_content(
+                  model="gemini-3.8-flash",
+                  contents=prompt,
+              )
           answer = (result.text or "").strip()
           if not answer:
               raise RuntimeError("Gemini returned an empty checklist")
