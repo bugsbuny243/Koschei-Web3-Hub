@@ -55,6 +55,8 @@ jobs:
         with:
           go-version-file: koschei/api/go.mod
           cache-dependency-path: koschei/api/go.sum
+      - name: Replay Binance archived delegation detection window
+        run: go test -v ./internal/networktarget ./internal/services -run '^(TestBinanceArchiveDelegationDetectionWindow|TestHistoricalProbe.*|TestBinanceArchiveReachesCustomerEvidence)$' -count=1
       - name: Verify multi-chain capability and API contracts
         run: |
           go run ./cmd/radar-capability-gen -check

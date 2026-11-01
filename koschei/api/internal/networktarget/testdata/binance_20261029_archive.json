@@ -1,0 +1,74 @@
+{
+  "schema_version": "koschei.evm-historical-probe-fixture.v1",
+  "provenance": {
+    "provider": "Alchemy eth-mainnet read-only MCP",
+    "retrieved_on": "2026-11-01",
+    "capture": "Selected block header fields and exact eth_getCode results; not a full block, execution trace or cryptographic state proof.",
+    "source": "https://www.trmlabs.com/resources/blog/north-korea-steals-usd-6-36-billion-from-binance-in-the-largest-hack-in-history"
+  },
+  "network": "ethereum-mainnet",
+  "chain_id": "0x1",
+  "address": "0x28c6c06298d514db089934071355e5743bf21d60",
+  "delegate": "0x63e842b054bd624a465454d533c33f573e9c6fae",
+  "snapshots": [
+    {
+      "phase": "before_delegation",
+      "block_number": "0x1915150",
+      "block_hash": "0xd961682f3e5d840aa19ba920ed52b7b9ba05cf75783b3938556212c0b7692098",
+      "parent_hash": "0x9b0f52060b30baa0fbe400958872e497e5dd80836af82b0f7b2abaee495a7194",
+      "timestamp": "0x6ae3aa9f",
+      "code": "0x"
+    },
+    {
+      "phase": "delegation",
+      "block_number": "0x1915151",
+      "block_hash": "0xc4c07ec29ae14deb72d35de4d7d944292f92fdf2716e76aed2b5df431110a548",
+      "parent_hash": "0xd961682f3e5d840aa19ba920ed52b7b9ba05cf75783b3938556212c0b7692098",
+      "timestamp": "0x6ae3aaab",
+      "code": "0xef010063e842b054bd624a465454d533c33f573e9c6fae"
+    },
+    {
+      "phase": "first_sweep",
+      "block_number": "0x1915162",
+      "block_hash": "0x087c33a63526887180f40a8fa2b66658fa0a3e83565ab5de0c956ffdd8eab727",
+      "parent_hash": "0x49014f384e737fef2a574936fb0da79f8c94eb885bac553fc87d8d4aec5a3579",
+      "timestamp": "0x6ae3ab77",
+      "code": "0xef010063e842b054bd624a465454d533c33f573e9c6fae"
+    },
+    {
+      "phase": "revoked",
+      "block_number": "0x19155c8",
+      "block_hash": "0xc7b5d3e6cd84c7895ca468e7e7b4245ef290ac186fb7f8d885de6dcad2c23afd",
+      "parent_hash": "0x95b6e8e5d2c2293c1e11b8d618a4a77c8eeb0b7ba136c9e888fa505e962474ad",
+      "timestamp": "0x6ae3e07b",
+      "code": "0x"
+    }
+  ],
+  "delegation_receipt": {
+    "type": "0x4",
+    "status": "0x1",
+    "cumulativeGasUsed": "0xf49892",
+    "logs": [],
+    "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "transactionHash": "0xad99264d5532ae0dd04b2004eebda05f25657e70dacb764f7ac8d4ccd051298b",
+    "transactionIndex": "0x8a",
+    "blockHash": "0xc4c07ec29ae14deb72d35de4d7d944292f92fdf2716e76aed2b5df431110a548",
+    "blockNumber": "0x1915151",
+    "gasUsed": "0x133442",
+    "effectiveGasPrice": "0x135f71859",
+    "from": "0x7c8601d4645b93cea45f71e118a729332e6b5ca0",
+    "to": "0x28c6c06298d514db089934071355e5743bf21d60",
+    "contractAddress": null
+  },
+  "sweep_transaction": {
+    "hash": "0x53bd38b816c23e74134786c29a8c18d792777998a3b9326047b583100e88e2f3",
+    "blockHash": "0x087c33a63526887180f40a8fa2b66658fa0a3e83565ab5de0c956ffdd8eab727",
+    "blockNumber": "0x1915162",
+    "transactionIndex": "0xbd",
+    "from": "0x7c8601d4645b93cea45f71e118a729332e6b5ca0",
+    "to": "0x28c6c06298d514db089934071355e5743bf21d60",
+    "type": "0x2",
+    "chainId": "0x1"
+  },
+  "sweep_receipt_status": "0x1"
+}
