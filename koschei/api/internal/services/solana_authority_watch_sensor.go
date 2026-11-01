@@ -391,8 +391,14 @@ func analyzeConfirmedSolanaAuthorityWatch(watch, signature string, slot int64, t
 	digest := fmt.Sprintf("%x", sha256.Sum256(encoded))
 	found := []solanaAuthorityWatchFinding{}
 	appendInstruction := func(raw any, scope string, i, j int) error {
-		entry := asRadarMap(raw)
-		program := anyString(entry["programId"])
+		entry, ok := raw.(map[string]any)
+		if !ok {
+			return errors.New("transaction instruction object unavailable")
+		}
+		program, ok := entry["programId"].(string)
+		if !ok || !isLikelyRadarSolanaAddress(program) {
+			return errors.New("transaction instruction program identity unavailable")
+		}
 		if program != splTokenProgramID && program != token2022ProgramID {
 			return nil
 		}
