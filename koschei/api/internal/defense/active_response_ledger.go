@@ -114,7 +114,7 @@ func BuildShadowLedgerEntry(
 		ProviderID:         review.ProviderID,
 		PlanDigest:         review.PlanDigest,
 		PreviousHash:       previousHash,
-		RecordedAt:         now.UTC(),
+		RecordedAt:         now.UTC().Truncate(time.Microsecond),
 		ExecutionPerformed: false,
 	}
 	chainHash, err := shadowLedgerEntryHash(entry)
