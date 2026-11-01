@@ -20,6 +20,9 @@ func TestActiveResponsePostgresStagingLedgerAcceptance(t *testing.T) {
 	if dsn == "" {
 		t.Skip("dedicated staging PostgreSQL acceptance requires explicit database URL")
 	}
+	if err := validateIsolatedShadowPostgresDSN(dsn); err != nil {
+		t.Fatalf("refusing unsafe shadow staging database DSN: %v", err)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	db, err := sql.Open("postgres", dsn)
