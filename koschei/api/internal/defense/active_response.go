@@ -88,14 +88,14 @@ type ActiveResponsePlan struct {
 // services, rather than accepted as caller-authorized input.
 func ProposeActiveResponse(policy DefensivePolicy, finding SecurityFinding, req DefensiveActionRequest, knownEvidence []string, asset ProtectedAsset) (ActiveResponsePlan, error) {
 	plan := ActiveResponsePlan{
-		SchemaVersion:     ActiveResponseSchemaVersion,
-		ActionID:          req.ActionID,
-		TenantID:          req.TenantID,
-		TargetID:          req.TargetID,
-		Action:            req.Action,
-		Status:            ActiveResponseDenied,
+		SchemaVersion:      ActiveResponseSchemaVersion,
+		ActionID:           req.ActionID,
+		TenantID:           req.TenantID,
+		TargetID:           req.TargetID,
+		Action:             req.Action,
+		Status:             ActiveResponseDenied,
 		ExecutionPerformed: false,
-		EffectAgreement:   ControlEffectNotExercised,
+		EffectAgreement:    ControlEffectNotExercised,
 	}
 	spec, ok := activeResponseSpecification(req.Action)
 	if !ok {
