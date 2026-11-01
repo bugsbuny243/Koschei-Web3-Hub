@@ -211,7 +211,7 @@ func TestOwnerSOCImmutableCanonicalReceiptPostgres(t *testing.T) {
 	// keyset pages and independently verified from original signed bytes.
 	for i := 0; i < 22; i++ {
 		newFinal := services.FinalizeUnifiedRadarVerdictContractForNetwork(final.Target, final.Network, services.UnifiedRadarVerdict{
-			GeneratedAt: time.Date(2026, 11, 1, 1, 0, i, 0, time.UTC),
+			GeneratedAt:     time.Date(2026, 11, 1, 1, 0, i, 0, time.UTC),
 			RulesetVersion: services.UnifiedRadarRulesetVersion,
 			ActorRuleset:   services.ActorDefenseRulesetVersion,
 			TriggeredRules: []services.ActorDefenseRuleHit{{
@@ -229,17 +229,17 @@ func TestOwnerSOCImmutableCanonicalReceiptPostgres(t *testing.T) {
 		}
 	}
 	requestCandidates := func(rawQuery string) (int, struct {
-		Items []ownerSOCVerdictCandidate `json:"items"`
-		HasMore bool `json:"has_more"`
-		NextCursor string `json:"next_cursor"`
+		Items      []ownerSOCVerdictCandidate `json:"items"`
+		HasMore    bool                       `json:"has_more"`
+		NextCursor string                     `json:"next_cursor"`
 	}) {
 		t.Helper()
 		w := httptest.NewRecorder()
 		h.OwnerSOCVerdictCandidates(w, httptest.NewRequest(http.MethodGet, "/api/owner/soc/verdict-candidates"+rawQuery, nil))
 		var got struct {
-			Items []ownerSOCVerdictCandidate `json:"items"`
-			HasMore bool `json:"has_more"`
-			NextCursor string `json:"next_cursor"`
+			Items      []ownerSOCVerdictCandidate `json:"items"`
+			HasMore    bool                       `json:"has_more"`
+			NextCursor string                     `json:"next_cursor"`
 		}
 		if w.Code == http.StatusOK {
 			if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
