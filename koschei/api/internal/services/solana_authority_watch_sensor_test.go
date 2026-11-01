@@ -98,6 +98,29 @@ func TestAuthorityWatchMissingOrForgedNativeProofWithholds(t *testing.T) {
 		{"corrupt_outer", func(tx SolanaTransactionResult) {
 			tx["transaction"].(map[string]any)["message"].(map[string]any)["instructions"] = "not-an-array"
 		}},
+		{"null_outer_instruction", func(tx SolanaTransactionResult) {
+			tx["transaction"].(map[string]any)["message"].(map[string]any)["instructions"].([]any)[0] = nil
+		}},
+		{"missing_outer_program_id", func(tx SolanaTransactionResult) {
+			entry := tx["transaction"].(map[string]any)["message"].(map[string]any)["instructions"].([]any)[0].(map[string]any)
+			delete(entry, "programId")
+		}},
+		{"malformed_outer_program_id", func(tx SolanaTransactionResult) {
+			entry := tx["transaction"].(map[string]any)["message"].(map[string]any)["instructions"].([]any)[0].(map[string]any)
+			entry["programId"] = "not-a-solana-program"
+		}},
+		{"null_cpi_instruction", func(tx SolanaTransactionResult) {
+			tx["meta"].(map[string]any)["innerInstructions"] = []any{map[string]any{
+				"index": float64(0), "instructions": []any{nil},
+			}}
+		}},
+		{"missing_cpi_program_id", func(tx SolanaTransactionResult) {
+			tx["meta"].(map[string]any)["innerInstructions"] = []any{map[string]any{
+				"index": float64(0), "instructions": []any{map[string]any{
+					"parsed": map[string]any{"type": "setAuthority"},
+				}},
+			}}
+		}},
 		{"unparsed_token", func(tx SolanaTransactionResult) {
 			tx["transaction"].(map[string]any)["message"].(map[string]any)["instructions"].([]any)[0].(map[string]any)["parsed"] = nil
 		}},
