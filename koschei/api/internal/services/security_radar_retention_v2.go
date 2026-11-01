@@ -95,6 +95,11 @@ func (w *securityRadarRetentionWorkerV2) runOnce(ctx context.Context) {
 		return
 	}
 	if err := w.base.exportPendingArchive(ctx, "before_retention_v2"); err != nil {
+		// Persist the preflight failure before returning. Without this entry
+		// the run ledger can appear healthy even when every scheduled attempt
+		// stops here. Never store the exporter error in the ledger: remote
+		// endpoints or credentials could be embedded in error messages.
+		w.base.recordHaltedRun(ctx, cutoff, "archive_export_preflight_failed")
 		log.Printf("radar retention v2: halted; %v", err)
 		return
 	}
