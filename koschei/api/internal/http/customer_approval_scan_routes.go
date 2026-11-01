@@ -36,6 +36,7 @@ type customerApprovalScanResult struct {
 	Reasons          []string                              `json:"reasons"`
 	SpenderAuthority *services.EVMSpenderAuthoritySnapshot `json:"spender_authority,omitempty"`
 	Exposure         customerApprovalExposure              `json:"exposure"`
+	ThreatAssessment services.SOCApprovalThreatAssessment   `json:"threat_assessment"`
 }
 
 type customerApprovalScanEnvelope struct {
@@ -166,6 +167,14 @@ func customerApprovalScan(w http.ResponseWriter, r *http.Request) {
 }
 
 func writeCustomerApprovalScanResult(w http.ResponseWriter, status int, result customerApprovalScanResult) {
+	// This is the production /api/scan/approval output boundary: only live
+	// RPC-derived current allowance and authenticated spender authority may
+	// produce a SOC-PB-03 exposure observation. Missing authority => WITHHOLD.
+	result.ThreatAssessment = services.DetectSOCApprovalThreat(networktarget.EVMAllowanceProbeResult{
+		Network: result.Network, Token: result.Token, Owner: result.Owner,
+		Spender: result.Spender, Amount: result.Amount, Unlimited: result.Unlimited,
+		EvidenceStatus: result.EvidenceStatus, LiveAvailability: result.LiveAvailability,
+	}, result.SpenderAuthority)
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(status)
