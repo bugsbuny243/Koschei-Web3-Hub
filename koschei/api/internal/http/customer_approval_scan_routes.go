@@ -86,6 +86,12 @@ func decodeCustomerApprovalScanRequest(r io.Reader) (customerApprovalScanRequest
 }
 
 func customerApprovalScan(w http.ResponseWriter, r *http.Request) {
+	customerApprovalScanWithRPCClient(w, r, nil)
+}
+
+// The production route uses the default verified HTTPS transport. Explicit
+// clients are confined to isolated TLS RPC integration tests.
+func customerApprovalScanWithRPCClient(w http.ResponseWriter, r *http.Request, client *http.Client) {
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
 	defer r.Body.Close()
 	mediaType, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
@@ -106,7 +112,7 @@ func customerApprovalScan(w http.ResponseWriter, r *http.Request) {
 
 	ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)
 	defer cancel()
-	allowance, err := networktarget.ProbeEVMAllowance(ctx, nil, endpoint, request.Network, request.Token, request.Owner, request.Spender)
+	allowance, err := networktarget.ProbeEVMAllowance(ctx, client, endpoint, request.Network, request.Token, request.Owner, request.Spender)
 	if err != nil {
 		writeCustomerApprovalScanError(w, http.StatusBadGateway, "evm_allowance_probe_unavailable")
 		return
@@ -138,14 +144,14 @@ func customerApprovalScan(w http.ResponseWriter, r *http.Request) {
 		writeCustomerApprovalScanResult(w, http.StatusOK, result)
 		return
 	}
-	codeProbe, codeErr := networktarget.ProbeEVM(ctx, nil, endpoint, resolution)
+	codeProbe, codeErr := networktarget.ProbeEVM(ctx, client, endpoint, resolution)
 	if codeErr != nil {
 		result.Reasons = services.NormalizeWeb3TrustReasons(append(result.Reasons, "SPENDER_AUTHORITY_UNAVAILABLE"))
 		result.Trust.Reasons = append([]string(nil), result.Reasons...)
 		writeCustomerApprovalScanResult(w, http.StatusOK, result)
 		return
 	}
-	proxyProbe, proxyErr := networktarget.ProbeEVMProxyAuthority(ctx, nil, endpoint, resolution)
+	proxyProbe, proxyErr := networktarget.ProbeEVMProxyAuthority(ctx, client, endpoint, resolution)
 	if proxyErr != nil {
 		result.Reasons = services.NormalizeWeb3TrustReasons(append(result.Reasons, "SPENDER_AUTHORITY_UNAVAILABLE"))
 		result.Trust.Reasons = append([]string(nil), result.Reasons...)
