@@ -69,3 +69,17 @@ func TestActiveResponseLedgerRetryHonorsCancellation(t *testing.T) {
 		t.Fatalf("canceled request attempted DB write: count=%d result=%+v err=%v", count, result, err)
 	}
 }
+
+func TestActiveResponseLedgerStopsAfterCancellationDuringSerialization(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	calls := 0
+	result, err := retryShadowLedgerSerialization(ctx, func() (ActiveResponseLedgerResult, error) {
+		calls++
+		cancel()
+		return ActiveResponseLedgerResult{}, &pq.Error{Code: "40001"}
+	})
+	if !errors.Is(err, context.Canceled) || calls != 1 || result.ExecutionPerformed {
+		t.Fatalf("retry ignored cancellation: calls=%d result=%+v err=%v", calls, result, err)
+	}
+}
