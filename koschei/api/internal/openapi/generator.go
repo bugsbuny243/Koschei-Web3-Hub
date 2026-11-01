@@ -295,6 +295,15 @@ func operation(route Route, method string) map[string]any {
 		requestSchemaRef = "#/components/schemas/TransactionStateRecheckRequest"
 		requestBodyRequired = true
 	}
+	if route.Path == "/api/v1/risk/badge" && method == "get" {
+		// The public badge cannot promote a legacy unsigned ARVIS-arm summary
+		// into a verified final. The current handler withholds on missing
+		// evidence, unverified target type or absent canonical signature.
+		description = "Public Solana token-mint badge. A verified final grade is not currently available from the legacy ARVIS compatibility adapter. A missing or unverifiable assessment returns HTTP 503 with signed=false, grade='-' and risk_index=null; it must not be treated as an A/low-risk verdict. Invalid addresses return 400 and verified non-mint targets return 422. The badge is disabled by default."
+		operationResponses["200"] = response("Reserved for a future independently verified, signed canonical badge result; not provided by the current compatibility adapter.", "#/components/schemas/EvidenceResponse")
+		operationResponses["422"] = response("Verified target is not a Solana token mint; no risk grade is issued.", "#/components/schemas/ErrorResponse")
+		operationResponses["503"] = response("Feature disabled or verifiable token-mint evidence/canonical signed final unavailable; the result is UNKNOWN, not a safety grade.", "#/components/schemas/ErrorResponse")
+	}
 	if route.Path == "/api/v1/radar/tron-wallet-permissions" {
 		description = "Read-only Tron account permission observations. Collection never issues a grade or proves account state at the separately observed head height."
 		operationResponses["503"] = response("Tron permission evidence unavailable.", "#/components/schemas/ErrorResponse")
@@ -328,6 +337,13 @@ func operation(route Route, method string) map[string]any {
 }
 
 func queryParameters(path string) []any {
+	if path == "/api/v1/risk/badge" {
+		return []any{
+			map[string]any{"name": "address", "in": "query", "required": false, "description": "Solana token mint address. Supply address or its legacy alias token.", "schema": map[string]any{"type": "string"}},
+			map[string]any{"name": "token", "in": "query", "required": false, "description": "Legacy alias for address; used only when address is absent or blank.", "schema": map[string]any{"type": "string"}},
+			map[string]any{"name": "network", "in": "query", "required": false, "description": "Network selector; defaults to solana-mainnet. Network-specific verification must be satisfied before any grade is published.", "schema": map[string]any{"type": "string", "default": "solana-mainnet"}},
+		}
+	}
 	if path != "/api/v1/radar/tron-wallet-permissions" {
 		return []any{}
 	}

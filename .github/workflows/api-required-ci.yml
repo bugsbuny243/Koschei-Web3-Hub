@@ -65,6 +65,10 @@ jobs:
           node --test public/js/__tests__/owner-multichain-radar.test.cjs
       - name: Verify public liveness truth contract
         run: node --test scripts/verify-public-health-liveness.test.cjs
+      - name: Verify public badge and static route fail-closed acceptance
+        run: |
+          go test ./internal/handlers -run '^(TestClassifyRadarAccountObservationSeparatesSolanaTargetKinds|TestRadarTargetParsedMintRequiresVerifiedTokenProgramOwner|TestClassifyRadarAccountObservationNilFailsClosed)$' -count=1
+          go test ./internal/http -run '^TestAudit' -count=1
       - name: Verify ARVIS widget and Shield SDK never turn missing evidence into allow
         run: node --test public/js/__tests__/arvis-widget-shield-failclosed.test.cjs
       - name: Verify browser logout and return-URL security

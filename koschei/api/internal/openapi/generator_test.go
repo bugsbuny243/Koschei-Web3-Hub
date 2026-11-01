@@ -79,6 +79,46 @@ func TestOpenAPIDocumentsWithholdAsValidEvidenceOutcome(t *testing.T) {
 	}
 }
 
+func TestPublicBadgeOpenAPIReflectsFailClosedRegisteredHandler(t *testing.T) {
+	_, sourceDir, _ := testPaths(t)
+	generated, _, err := Generate(sourceDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var document map[string]any
+	if err := json.Unmarshal(generated, &document); err != nil {
+		t.Fatal(err)
+	}
+	op := object(object(object(document["paths"])["/api/v1/risk/badge"])["get"])
+	responses := object(op["responses"])
+	for _, status := range []string{"200", "400", "405", "422", "429", "503"} {
+		if _, ok := responses[status]; !ok {
+			t.Errorf("badge route missing documented HTTP status %s", status)
+		}
+	}
+	description, _ := op["description"].(string)
+	for _, term := range []string{"signed=false", "risk_index=null", "503"} {
+		if !strings.Contains(description, term) {
+			t.Errorf("badge description lacks %q: %s", term, description)
+		}
+	}
+	params, ok := op["parameters"].([]any)
+	if !ok || len(params) != 3 {
+		t.Fatalf("badge query parameters: %v", op["parameters"])
+	}
+	for _, name := range []string{"address", "token", "network"} {
+		found := false
+		for _, item := range params {
+			if object(item)["name"] == name {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("missing badge query parameter %q", name)
+		}
+	}
+}
+
 func TestStateRecheckDocumentsFailClosedHTTPStatuses(t *testing.T) {
 	_, _, documentPath := testPaths(t)
 	committed, err := os.ReadFile(documentPath)
