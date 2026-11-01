@@ -335,3 +335,35 @@ record-count consistency, tenant boundaries, future-time rejection and
 low-level write fail-closed behavior. A **real PostgreSQL staging acceptance
 run**, independently protected checkpoint storage and a durable replay
 claim for any future live executor remain outstanding.
+
+## v1.6 explicitly isolated PostgreSQL staging acceptance
+
+`active_response_ledger_postgres_test.go` adds an opt-in PostgreSQL
+integration test. The test **skips automatically** unless the dedicated
+`KOSCHEI_ACTIVE_RESPONSE_STAGING_TEST_DATABASE_URL` variable is set, then
+queries `current_database()` and **refuses every name other than**
+`koschei_shadow_test`. It does not apply migrations or create tables.
+The staging SQL file must already have been reviewed and installed by a
+database administrator in this disposable, isolated test database.
+
+In an authorized staging environment only:
+
+```bash
+# Create an isolated database named koschei_shadow_test beforehand.
+# Review and apply docs/security-center/ACTIVE_RESPONSE_LEDGER_STAGING_V1.sql
+# with your staging DBA; do not run it on production.
+cd koschei/api
+KOSCHEI_ACTIVE_RESPONSE_STAGING_TEST_DATABASE_URL='<dedicated-test-DSN>' \
+  go test ./internal/defense -run '^TestActiveResponsePostgresStagingLedgerAcceptance$' -count=1
+```
+
+The test checks the initial append, identical action-ID replay, rejection of a
+different digest under the same action ID, the one-plan/one-audit-row invariant
+and chain re-verification using data retrieved from PostgreSQL. It writes
+uniquely named tenant-scoped test records and does not clean up append-only
+rows; dispose of the dedicated test database after acceptance.
+
+**Not yet demonstrated:** simultaneous write races, serializable retry
+behavior, DB failover, role-level permissions and independent off-database
+checkpoint archival. Do not equate this opt-in staging test with a completed
+production acceptance.
