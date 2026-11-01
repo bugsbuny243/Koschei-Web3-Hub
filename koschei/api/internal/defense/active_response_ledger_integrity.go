@@ -26,13 +26,13 @@ type ActiveResponseLedgerIntegrity struct {
 // ExecutionPerformed is validated separately and must remain false.
 func shadowLedgerEntryHash(entry ActiveResponseLedgerEntry) (string, error) {
 	payload := struct {
-		SchemaVersion string `json:"schema_version"`
-		TenantID      string `json:"tenant_id"`
-		ActionID      string `json:"action_id"`
-		TargetID      string `json:"target_id"`
-		ProviderID    string `json:"provider_id"`
-		PlanDigest    string `json:"plan_digest"`
-		PreviousHash  string `json:"previous_hash"`
+		SchemaVersion string    `json:"schema_version"`
+		TenantID      string    `json:"tenant_id"`
+		ActionID      string    `json:"action_id"`
+		TargetID      string    `json:"target_id"`
+		ProviderID    string    `json:"provider_id"`
+		PlanDigest    string    `json:"plan_digest"`
+		PreviousHash  string    `json:"previous_hash"`
 		RecordedAt    time.Time `json:"recorded_at"`
 	}{
 		entry.SchemaVersion, entry.TenantID, entry.ActionID, entry.TargetID,
