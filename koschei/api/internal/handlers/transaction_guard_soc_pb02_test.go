@@ -100,6 +100,11 @@ func TestSOCPreSignPB02DetectsNestedCPISetAuthority(t *testing.T) {
 	if withoutCPI.FindingState != "withheld" || withoutCPI.EvidenceState != "incomplete_or_conflicting" {
 		t.Fatalf("missing CPI evidence was promoted into a complete decision: %+v", withoutCPI)
 	}
+	optionalIncomplete := buildTransactionGuardSOCPlaybook02(pb02Simulated(), decoded,
+		transactionGuardCPIFlowAnalysis{Required: false, Available: true, Complete: false}, surface)
+	if optionalIncomplete.FindingState != "withheld" {
+		t.Fatalf("an incomplete nested CPI was accepted as complete under optional policy: %+v", optionalIncomplete)
+	}
 }
 
 func TestSOCPreSignPB02KeepsNormalInstructionsAndMissingEvidenceSeparate(t *testing.T) {
