@@ -41,6 +41,7 @@ th{color:#a8c4c5;font-size:11px;letter-spacing:.04em}td small{display:block;colo
 <p class="boundary">Read-only verified signed verdicts are NOT SOC incidents, containment decisions or an automatic severity assessment. Each case must be created or linked explicitly through the existing authenticated owner incident workflow.</p>
 <p id="signed-decision-status" role="status" aria-live="polite">Signed receipt candidates: unverified.</p>
 <div class="scroll"><table id="signed-candidates"><thead><tr><th>Recorded</th><th>Network / target</th><th>Authenticated final</th><th>Owner case</th><th>Copy-ready signed SOC evidence reference</th></tr></thead><tbody id="signed-decision-rows"></tbody></table></div>
+<button id="older-signed-decisions" type="button" hidden>Load older independently verified decisions</button>
 </section><p class="muted">Only the latest 100 cases in this view. Empty, unavailable and incomplete data are never interpreted as a safe chain or a healthy SOC.</p>
 </main>
 <script>
@@ -54,6 +55,8 @@ var refresh=document.getElementById("refresh");
 var filter=document.getElementById("case-status");
 var signedStatus=document.getElementById("signed-decision-status");
 var signedRows=document.getElementById("signed-decision-rows");
+var olderSigned=document.getElementById("older-signed-decisions");
+var nextSignedCursor="";
 function label(v){return typeof v==="string" && v.trim()?v:"Unknown";}
 function text(tag,value){var el=document.createElement(tag);el.textContent=value;return el;}
 function cell(row,value,sub){
@@ -117,18 +120,24 @@ function render(data){
  }
  status.textContent="Read-only snapshot · "+label(data.as_of)+" · "+data.items.length+" returned cases.";
 }
-async function loadCandidates(){
+async function loadCandidates(pageCursor){
+ olderSigned.hidden=true;
  signedRows.replaceChildren();
  signedStatus.textContent="Reading independently authenticated decision candidates...";
  try{
-   var response=await fetch("/api/owner/soc/verdict-candidates",{method:"GET",credentials:"same-origin",cache:"no-store",headers:{"Accept":"application/json"}});
+   var url="/api/owner/soc/verdict-candidates"+(pageCursor?"?cursor="+encodeURIComponent(pageCursor):"");
+   var response=await fetch(url,{method:"GET",credentials:"same-origin",cache:"no-store",headers:{"Accept":"application/json"}});
    if(!response.ok){throw new Error("Trusted candidate proof unavailable (HTTP "+response.status+")");}
    var data=await response.json();
-   if(data.ok!==true||!Array.isArray(data.items)||data.schema_version!=="koschei.owner-soc-signed-candidates.v1"){throw new Error("Candidate schema was not validated");}
+   if(data.ok!==true||!Array.isArray(data.items)||data.schema_version!=="koschei.owner-soc-signed-candidates.v1"||
+     data.count!==data.items.length||typeof data.has_more!=="boolean"||typeof data.next_cursor!=="string"||
+     (data.has_more&&(!data.next_cursor||!data.items.length))||(!data.has_more&&data.next_cursor)){throw new Error("Candidate schema was not validated");}
    for(var candidate of data.items){
      if(!candidate||typeof candidate.evidence_ref!=="string"||!candidate.evidence_ref.startsWith("unified-verdict-ledger:")){throw new Error("Candidate evidence contract invalid");}
    }
-   signedStatus.textContent=data.items.length+" independently verified signed finals in the bounded recent sample. A decision is not a SOC case.";
+   nextSignedCursor=data.next_cursor;
+   olderSigned.hidden=!data.has_more;
+   signedStatus.textContent=data.items.length+" independently verified signed finals on this bounded page. A decision is not a SOC case.";
    if(!data.items.length){
      signedRows.appendChild(text("tr","No signed token decisions in the verified sample. This does not prove that the whole ledger is empty."));
      return;
@@ -150,6 +159,7 @@ async function loadCandidates(){
      td.appendChild(ref);td.appendChild(document.createElement("br"));td.appendChild(copy);tr.appendChild(td);signedRows.appendChild(tr);
    }
  }catch(e){
+   nextSignedCursor="";olderSigned.hidden=true;
    signedRows.replaceChildren();
    signedStatus.textContent="Signed ARVIS candidates UNVERIFIED / UNAVAILABLE. No pending cases or safe verdicts may be inferred.";
  }
@@ -189,6 +199,7 @@ async function load(){
  }catch(err){status.textContent=String(err&&err.message||"Queue unavailable")+" No empty/healthy state is inferred.";}
  finally{refresh.disabled=false;}
 }
+olderSigned.addEventListener("click",function(){if(nextSignedCursor){loadCandidates(nextSignedCursor);}});
 refresh.addEventListener("click",function(){loadReadiness();loadCandidates();load();});filter.addEventListener("change",load);loadReadiness();loadCandidates();load();
 })();
 </script></body></html>`
