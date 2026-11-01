@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -11,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"koschei/api/internal/services"
 
@@ -57,6 +59,7 @@ func TestOwnerSOCImmutableCanonicalReceiptPostgres(t *testing.T) {
 		"137_soc_operations.sql",
 		"138_unified_verdict_immutable_receipts.sql",
 		"139_unified_verdict_receipt_recent_proof_index.sql",
+		"140_unified_verdict_receipt_history_index.sql",
 	} {
 		raw, err := os.ReadFile(filepath.Join("..", "..", "migrations", migration))
 		if err != nil {
@@ -203,6 +206,93 @@ func TestOwnerSOCImmutableCanonicalReceiptPostgres(t *testing.T) {
 	if _, err := db.Exec("TRUNCATE security_unified_verdict_receipts"); err == nil {
 		t.Fatal("append-only ledger permitted TRUNCATE")
 	}
+	// The mutable fingerprint projection now points to newer signatures. The
+	// oldest immutable receipt must still be discoverable via owner-only
+	// keyset pages and independently verified from original signed bytes.
+	for i := 0; i < 22; i++ {
+		newFinal := services.FinalizeUnifiedRadarVerdictContractForNetwork(final.Target, final.Network, services.UnifiedRadarVerdict{
+			GeneratedAt: time.Date(2026, 11, 1, 1, 0, i, 0, time.UTC),
+			RulesetVersion: services.UnifiedRadarRulesetVersion,
+			ActorRuleset:   services.ActorDefenseRulesetVersion,
+			TriggeredRules: []services.ActorDefenseRuleHit{{
+				RuleID: services.ActorRuleCompoundCreatorReuse,
+				Tier: "compounding", EvidenceStatus: "verified",
+				Summary: fmt.Sprintf("verified creator evidence iteration %d", i),
+			}},
+		})
+		if !newFinal.Signed {
+			t.Fatal("historical pagination test signer unavailable")
+		}
+		newRecord, err := store.Persist(context.Background(), final.Network, "token", final.Target, newFinal, services.UnifiedRadarBehaviorReport{})
+		if err != nil || newRecord.LedgerID == "" {
+			t.Fatalf("cannot persist historical signed page receipt %d: %+v %v", i, newRecord, err)
+		}
+	}
+	requestCandidates := func(rawQuery string) (int, struct {
+		Items []ownerSOCVerdictCandidate `json:"items"`
+		HasMore bool `json:"has_more"`
+		NextCursor string `json:"next_cursor"`
+	}) {
+		t.Helper()
+		w := httptest.NewRecorder()
+		h.OwnerSOCVerdictCandidates(w, httptest.NewRequest(http.MethodGet, "/api/owner/soc/verdict-candidates"+rawQuery, nil))
+		var got struct {
+			Items []ownerSOCVerdictCandidate `json:"items"`
+			HasMore bool `json:"has_more"`
+			NextCursor string `json:"next_cursor"`
+		}
+		if w.Code == http.StatusOK {
+			if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return w.Code, got
+	}
+	scoped := "?network=" + url.QueryEscape(final.Network) + "&target=" + url.QueryEscape(final.Target)
+	status, firstPage := requestCandidates(scoped)
+	if status != http.StatusOK || len(firstPage.Items) != 20 ||
+		!firstPage.HasMore || firstPage.NextCursor == "" {
+		t.Fatalf("owner historical first page incorrect: status=%d count=%d has_more=%v", status, len(firstPage.Items), firstPage.HasMore)
+	}
+	status, secondPage := requestCandidates(scoped + "&cursor=" + url.QueryEscape(firstPage.NextCursor))
+	if status != http.StatusOK || len(secondPage.Items) != 3 || secondPage.HasMore ||
+		secondPage.NextCursor != "" {
+		t.Fatalf("owner historical second page incorrect: status=%d count=%d has_more=%v", status, len(secondPage.Items), secondPage.HasMore)
+	}
+	seenOld := false
+	for _, item := range secondPage.Items {
+		if item.EvidenceRef == ref {
+			seenOld = true
+			if !item.Linked {
+				t.Fatal("historical immutable receipt lost its explicit SOC case link")
+			}
+		}
+	}
+	if !seenOld {
+		t.Fatal("the oldest cryptographically verified receipt was not recoverable after rescan")
+	}
+	if code, page := requestCandidates("?network=solana-mainnet&target=DifferentMint"); code != http.StatusOK || len(page.Items) != 0 {
+		t.Fatalf("target-scoped immutable history leaked a different subject: status=%d count=%d", code, len(page.Items))
+	}
+	for _, malformed := range []string{
+		"?network=solana-mainnet",
+		"?target=MintImmutableSOC",
+		"?cursor=bad",
+		"?network=solana-mainnet&target=MintImmutableSOC&cursor=bad",
+		"?network=solana-mainnet&target=MintImmutableSOC&target=MintImmutableSOC",
+		"?unexpected=1",
+		"?cursor=%ZZ",
+	} {
+		if code, _ := requestCandidates(malformed); code != http.StatusBadRequest {
+			t.Fatalf("unsafe historical cursor or filter accepted: %s status=%d", malformed, code)
+		}
+	}
+	t.Setenv("KOSCHEI_ARVIS_STREAM_TRUSTED_VERDICT_KEYS_JSON", "")
+	if code, _ := requestCandidates(scoped + "&cursor=" + url.QueryEscape(firstPage.NextCursor)); code != http.StatusServiceUnavailable {
+		t.Fatalf("historical page accepted missing trusted public keys: %d", code)
+	}
+	t.Setenv("KOSCHEI_ARVIS_STREAM_TRUSTED_VERDICT_KEYS_JSON", string(keys))
+
 	// Direct SQL inserts are not a trust root: even if a database writer injects
 	// plausible metadata, only an independently verified signed payload counts.
 	if _, err := db.Exec(`
