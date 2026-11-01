@@ -358,16 +358,13 @@ func analyzeConfirmedSolanaAuthorityWatch(watch, signature string, slot int64, t
 	if !ok {
 		return nil, errors.New("transaction outer instructions missing")
 	}
-	if _, exists := meta["innerInstructions"]; !exists {
-		return nil, errors.New("transaction CPI evidence unavailable")
+	innerRaw, exists := meta["innerInstructions"]
+	if !exists || innerRaw == nil {
+		return nil, errors.New("transaction CPI evidence unavailable or unrecorded")
 	}
-	inner := []any{}
-	if meta["innerInstructions"] != nil {
-		var cast bool
-		inner, cast = meta["innerInstructions"].([]any)
-		if !cast {
-			return nil, errors.New("transaction inner CPI evidence malformed")
-		}
+	inner, ok := innerRaw.([]any)
+	if !ok {
+		return nil, errors.New("transaction inner CPI evidence malformed")
 	}
 	encoded, err := json.Marshal(tx)
 	if err != nil || len(encoded) > 2<<20 {
@@ -408,6 +405,14 @@ func analyzeConfirmedSolanaAuthorityWatch(watch, signature string, slot int64, t
 			}
 			authorityType = "permanentDelegate"
 			newAuthority = anyString(info["delegate"])
+			if newAuthority == "" {
+				return errors.New("permanent delegate identity missing")
+			}
+		} else {
+			rawAuthority, hasAuthority := info["newAuthority"]
+			if !hasAuthority || (rawAuthority != nil && newAuthority == "") {
+				return errors.New("new authority presence or identity unavailable")
+			}
 		}
 		if authorityType == "" {
 			return errors.New("SPL authority mutation type unavailable")
@@ -444,10 +449,11 @@ func analyzeConfirmedSolanaAuthorityWatch(watch, signature string, slot int64, t
 	}
 	for _, rawGroup := range inner {
 		group := asRadarMap(rawGroup)
-		index := int(radarInt64(group["index"]))
-		if index < 0 || index >= len(outer) {
+		rawIndex, indexOK := group["index"].(float64)
+		if !indexOK || rawIndex < 0 || rawIndex >= float64(len(outer)) || rawIndex != float64(int(rawIndex)) {
 			return nil, errors.New("invalid CPI instruction group index")
 		}
+		index := int(rawIndex)
 		entries, ok := group["instructions"].([]any)
 		if !ok {
 			return nil, errors.New("CPI instruction group has missing entries")
