@@ -110,14 +110,14 @@ func BuildShadowLedgerEntry(
 		return ActiveResponseLedgerEntry{}, errors.New("invalid previous chain hash")
 	}
 	entry := ActiveResponseLedgerEntry{
-		SchemaVersion: ActiveResponseLedgerSchemaVersion,
-		TenantID: plan.TenantID,
-		ActionID: plan.ActionID,
-		TargetID: plan.TargetID,
-		ProviderID: review.ProviderID,
-		PlanDigest: review.PlanDigest,
-		PreviousHash: previousHash,
-		RecordedAt: now.UTC(),
+		SchemaVersion:      ActiveResponseLedgerSchemaVersion,
+		TenantID:           plan.TenantID,
+		ActionID:           plan.ActionID,
+		TargetID:           plan.TargetID,
+		ProviderID:         review.ProviderID,
+		PlanDigest:         review.PlanDigest,
+		PreviousHash:       previousHash,
+		RecordedAt:         now.UTC(),
 		ExecutionPerformed: false,
 	}
 	canonical, err := json.Marshal(struct {
