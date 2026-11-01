@@ -123,6 +123,26 @@ func TestSOCPreSignPB02KeepsNormalInstructionsAndMissingEvidenceSeparate(t *test
 	}
 }
 
+func TestSOCPreSignPB02VerifiesSimulatedTokenAccountOwnerMutation(t *testing.T) {
+	account := guardV3TestAddress(35)
+	newOwner := guardV3TestAddress(37)
+	decoded := guardV3AuthorityTestDecoded(guardV3SPLTokenProgramID,
+		[]string{account, guardV3TestAddress(36)}, pb02SetAuthorityData(t, 2, false))
+	post := guardV3AuthorityTokenInfo(t, guardV3TestAddress(39), newOwner, guardV3TestAddress(40), 0)
+	surface, _ := analyzeTransactionGuardV3AuthoritySurface(decoded, nil,
+		transactionGuardAuthoritySnapshots{PostOrder: []string{account}, Post: []*services.SolanaAccountInfo{post}})
+	if !surface.Complete || len(surface.Events) != 1 ||
+		!surface.Events[0].PostStateAvailable || surface.Events[0].ActiveAfterSimulation == nil ||
+		!*surface.Events[0].ActiveAfterSimulation || surface.Events[0].PostOwner != newOwner {
+		t.Fatalf("simulated owner change was not independently verified: %+v", surface)
+	}
+	result := buildTransactionGuardSOCPlaybook02(pb02Simulated(), decoded, pb02FullCPI(), surface)
+	if result.FindingState != "token_authority_mutation_proposed" || result.Severity != "high" ||
+		len(result.Events) != 1 || !result.Events[0].PostStateVerified {
+		t.Fatalf("verified owner mutation not detected: %+v", result)
+	}
+}
+
 func TestSOCPreSignPB02RoutedResponseNeverClaimsSignerEnforcement(t *testing.T) {
 	t.Setenv("TRANSACTION_GUARD_REQUIRE_ENFORCEMENT_PERMIT", "false")
 	input, assessment, witness := completeGuardResponseFixture(t)
