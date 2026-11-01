@@ -120,3 +120,18 @@ func TestActiveResponsePreservesExistingHumanGate(t *testing.T) {
 		t.Fatalf("policy human gate lost: %+v, %v", plan, err)
 	}
 }
+
+
+func TestActiveResponseRejectsEmptyTargetAndLowSeverityHighImpact(t *testing.T) {
+	policy, finding, req, asset := activeResponseFixture("pause_contract", "smart_contract")
+	req.TargetID = ""
+	if _, err := ProposeActiveResponse(policy, finding, req, finding.EvidenceIDs, asset); err == nil {
+		t.Fatal("empty target accepted")
+	}
+	req.TargetID = "asset-a"
+	finding.Severity = "low"
+	plan, err := ProposeActiveResponse(policy, finding, req, finding.EvidenceIDs, asset)
+	if err != nil || plan.Status != ActiveResponseDenied {
+		t.Fatalf("low-severity contract pause proposal accepted: %+v, %v", plan, err)
+	}
+}
