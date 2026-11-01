@@ -105,8 +105,8 @@ func ProposeActiveResponse(policy DefensivePolicy, finding SecurityFinding, req 
 	plan.ProviderCapability = spec.ProviderCapability
 	plan.MaxDurationSeconds = spec.MaxDurationSeconds
 
-	if strings.TrimSpace(req.ActionID) == "" {
-		return plan, errors.New("action_id is required")
+	if strings.TrimSpace(req.ActionID) == "" || strings.TrimSpace(req.TargetID) == "" || strings.TrimSpace(req.TenantID) == "" {
+		return plan, errors.New("action_id, tenant_id and target_id are required")
 	}
 	if math.IsNaN(finding.Confidence) || math.IsInf(finding.Confidence, 0) {
 		return plan, errors.New("confidence must be finite")
@@ -123,6 +123,10 @@ func ProposeActiveResponse(policy DefensivePolicy, finding SecurityFinding, req 
 	minConfidence := 0.85
 	if spec.HighImpact {
 		minConfidence = 0.95
+	}
+	if spec.HighImpact && finding.Severity != "high" && finding.Severity != "critical" {
+		plan.Reason = "high-impact action requires a high or critical verified finding"
+		return plan, nil
 	}
 	if finding.Confidence < minConfidence {
 		plan.Reason = "finding confidence is below the action's threshold"
