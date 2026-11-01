@@ -74,6 +74,8 @@ test('only exact canonical public dossier URLs are accepted', () => {
 test('rejects mentions, HTML/control characters, secrets and personal email data', () => {
   for (const unsafe of [
     '@everyone urgent action',
+    '@unrelated-user see this',
+    'Danger ‮ reversed characters',
     '<script>alert(1)</script>',
     'Send to person@example.com immediately',
     'API_KEY=abcdefgh123456',
