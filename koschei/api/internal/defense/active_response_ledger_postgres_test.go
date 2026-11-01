@@ -190,6 +190,51 @@ func TestActiveResponsePostgresStagingLedgerAcceptance(t *testing.T) {
 		result.Status != "rejected" {
 		t.Fatalf("stale signed ledger head accepted: %+v %v", result, err)
 	}
+
+	// Independently retained, previously authenticated high-water state
+	// prevents rollback or a re-signed fork of the first observed event.
+	fence := TrustedShadowLedgerHighWatermark{
+		TenantID:        tenant,
+		RecordsVerified: 1,
+		ChainHash:       first.ChainHash,
+		IssuedAt:        cp.IssuedAt,
+	}
+	advancedCP := cp
+	advancedCP.RecordCount = 2
+	advancedCP.EndHash = recordTwo.ChainHash
+	advancedCP.IssuedAt = cp.IssuedAt.Add(time.Second)
+	signed, err := ActiveResponseCheckpointSigningPayload(advancedCP)
+	if err != nil {
+		t.Fatal(err)
+	}
+	advancedCP.Signature = ed25519.Sign(priv, signed)
+	advanced, err := VerifyCurrentShadowLedgerCheckpointWithHighWatermark(
+		ctx, db, advancedCP, keys, fence, now.Add(time.Minute),
+	)
+	if err != nil || advanced.Status != "verified" ||
+		advanced.RecordsVerified != 2 || advanced.ExecutionPerformed {
+		t.Fatalf("independently fenced ledger advancement failed: %+v %v", advanced, err)
+	}
+	forkedFence := fence
+	forkedFence.ChainHash = "sha256:" + fmt.Sprintf("%064x", 1)
+	forked, err := VerifyCurrentShadowLedgerCheckpointWithHighWatermark(
+		ctx, db, advancedCP, keys, forkedFence, now.Add(time.Minute),
+	)
+	if err == nil || forked.Status != "rejected" {
+		t.Fatalf("signed ledger fork accepted against external high-water mark: %+v %v", forked, err)
+	}
+	rolledBack := TrustedShadowLedgerHighWatermark{
+		TenantID:        tenant,
+		RecordsVerified: 2,
+		ChainHash:       advancedCP.EndHash,
+		IssuedAt:        advancedCP.IssuedAt,
+	}
+	rollback, err := VerifyCurrentShadowLedgerCheckpointWithHighWatermark(
+		ctx, db, cp, keys, rolledBack, now.Add(time.Minute),
+	)
+	if err == nil || rollback.Status != "rejected" {
+		t.Fatalf("older valid signature accepted despite higher trusted checkpoint: %+v %v", rollback, err)
+	}
 }
 
 func resignShadowLedgerFixture(t *testing.T, input *TrustedShadowLedgerInputs, now time.Time) {
