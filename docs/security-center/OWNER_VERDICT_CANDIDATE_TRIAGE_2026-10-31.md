@@ -37,6 +37,49 @@ proof of a failed database linkage.
   active SOC staffing, live customer→case acceptance or enforceable
   blockchain intervention.
 
+## Historical signed receipt browsing (2026-11-01)
+
+The original, unfiltered GET /api/owner/soc/verdict-candidates remains a
+read-only 20-newest-token view. The same owner-authenticated route now supports:
+
+- An optional **exact pair** of network and target query parameters,
+  selecting one token subject without falling back to another network.
+- An optional cursor returned as next_cursor from a preceding response.
+  The cursor is an opaque base64url encoding of the exclusive immutable
+  (recorded_at,id) keyset boundary. It is not a capability or a signature.
+- has_more and next_cursor fields in the unchanged
+  koschei.owner-soc-signed-candidates.v1 response. Every page reads at most
+  21 rows, independently authenticates at most 20, and returns at most 20.
+  The extra row establishes only has_more.
+- The private /owner/soc-triage page has an **older signed decisions**
+  navigation button. This replaces the displayed page, not the original
+  signed payloads. Refresh returns to the latest page.
+
+Example of authenticated owner GET requests:
+
+    /api/owner/soc/verdict-candidates?network=solana-mainnet&target=<exact-mint>
+    /api/owner/soc/verdict-candidates?network=solana-mainnet&target=<exact-mint>&cursor=<next_cursor>
+
+Unknown/duplicate parameters, incomplete network/target pairs, malformed
+cursors, missing trusted public keys and altered canonical payloads fail closed.
+Pages are ordered by (recorded_at DESC,id DESC) so identical timestamps cannot
+skip a decision. Old receipts do **not** depend on the current mutable
+fingerprint row. They must still pass independent canonical Ed25519 and subject
+verification against operator-managed historical public trust keys.
+
+**Boundary:** A page of verified receipts is not a full ledger audit, a
+proof of absence of missing or deleted rows, a production customer debit,
+a completed owner SOC case, or external WORM retention. has_more=false
+means no additional matching rows **in the database at query time**, not
+that no earlier decision was ever issued. Historical records that predate
+the append-only migration and never had original independently verifiable
+canonical bytes cannot be reconstructed or called authenticated history.
+
+Migration 140_unified_verdict_receipt_history_index.sql adds an index for
+bounded target-scoped keyset queries. Isolated PostgreSQL acceptance proves an
+original receipt remains retrievable after 22 later authenticated finals,
+including after the mutable projection signature has been overwritten.
+
 ## Gates
 
 - HTTP route test: unauthorized access is hidden, authenticated GET
