@@ -222,8 +222,26 @@ func (w *solanaAuthorityWatchSensor) processAddress(ctx context.Context, address
 		if cursor.Signature == "" && exhausted {
 			return nil
 		}
-		_, _ = w.DB.ExecContext(ctx, `UPDATE security_solana_authority_watch_cursors
-			SET last_polled_at=now(),updated_at=now() WHERE watch_address=$1`, address)
+		// Reaching the previous watermark on a successful idle poll clears
+		// transient RPC/gap errors without erasing an initial history gap.
+		status := "caught_up"
+		if cursor.InitialWindowTruncated {
+			status = "bootstrap_window_only"
+		}
+		result, updateErr := w.DB.ExecContext(ctx, `UPDATE security_solana_authority_watch_cursors
+			SET status=$4,last_error='',last_polled_at=now(),updated_at=now()
+			WHERE watch_address=$1 AND watermark_signature=$2 AND watermark_slot=$3`,
+			address, cursor.Signature, cursor.Slot, status)
+		if updateErr != nil {
+			return updateErr
+		}
+		updated, rowsErr := result.RowsAffected()
+		if rowsErr != nil {
+			return rowsErr
+		}
+		if updated != 1 {
+			return errors.New("watch cursor moved during idle poll; retry without a false recovery")
+		}
 		return nil
 	}
 	// Bootstrap deliberately inspects ONLY the most recent page. Historical
