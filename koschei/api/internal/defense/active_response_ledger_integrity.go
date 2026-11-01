@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
+	"time"
 )
 
 const ActiveResponseLedgerIntegritySchemaVersion = "koschei-active-response-ledger-integrity-v1"
@@ -33,7 +33,7 @@ func shadowLedgerEntryHash(entry ActiveResponseLedgerEntry) (string, error) {
 		ProviderID    string `json:"provider_id"`
 		PlanDigest    string `json:"plan_digest"`
 		PreviousHash  string `json:"previous_hash"`
-		RecordedAt    interface{} `json:"recorded_at"`
+		RecordedAt    time.Time `json:"recorded_at"`
 	}{
 		entry.SchemaVersion, entry.TenantID, entry.ActionID, entry.TargetID,
 		entry.ProviderID, entry.PlanDigest, entry.PreviousHash, entry.RecordedAt.UTC(),
@@ -99,7 +99,7 @@ func VerifyShadowLedgerSnapshot(
 			return result, fmt.Errorf("replayed chain hash at index %d", index)
 		}
 		calculated, err := shadowLedgerEntryHash(entry)
-		if err != nil || !strings.EqualFold(calculated, entry.ChainHash) || calculated != entry.ChainHash {
+		if err != nil || calculated != entry.ChainHash {
 			return result, fmt.Errorf("shadow ledger digest mismatch at index %d", index)
 		}
 		seenActions[entry.ActionID] = struct{}{}
