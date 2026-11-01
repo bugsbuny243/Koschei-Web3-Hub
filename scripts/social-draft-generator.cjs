@@ -16,7 +16,7 @@ function plainText(value, label, maxLength) {
   if (typeof value !== 'string') throw new Error(label + ' must be text');
   const text = value.normalize('NFC').trim();
   if (text.length < 8 || [...text].length > maxLength ||
-      /[\u0000-\u001f\u007f<>]/u.test(text) ||
+      /[\u0000-\u001f\u007f<>@\u202a-\u202e\u2066-\u2069]/u.test(text) ||
       /@(everyone|here)\b/i.test(text) ||
       /\b(?:bearer\s+[a-z0-9]|api[_ -]?key\s*[:=]|private\s+key|seed\s+phrase|password\s*[:=])/i.test(text) ||
       /[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/.test(text)) {
