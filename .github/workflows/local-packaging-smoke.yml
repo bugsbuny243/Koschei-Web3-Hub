@@ -1,0 +1,56 @@
+name: Local Packaging Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'compose.yaml'
+      - 'Makefile'
+      - '.dockerignore'
+      - 'scripts/verify-local-packaging.cjs'
+      - 'docs/LOCAL_PACKAGING_V1.md'
+      - '.github/workflows/local-packaging-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  local-compose:
+    name: Stateless Docker Compose packaging contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Validate local configuration and no-billing contract
+        run: |
+          set -euo pipefail
+          make config
+          node scripts/verify-local-packaging.cjs
+      - name: Build and launch local API using existing Dockerfile
+        run: |
+          set -euo pipefail
+          make up
+      - name: Verify public liveness without database entitlement
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 45); do
+            if curl --fail --silent --show-error --max-time 3 \
+              http://127.0.0.1:8080/health > /tmp/koschei-health.json 2>/dev/null; then
+              break
+            fi
+            sleep 2
+          done
+          test -s /tmp/koschei-health.json
+          node -e '
+            const fs = require("node:fs");
+            const data = JSON.parse(fs.readFileSync("/tmp/koschei-health.json", "utf8"));
+            if (data.status !== "ok" || data.persistence !== "stateless" ||
+                data.database !== "not_used") {
+              throw new Error("local API must remain stateless (liveness only)");
+            }
+            console.log("PASS: local stateless /health");
+          '
+      - name: Tear down disposable developer container
+        if: always()
+        run: docker compose -f compose.yaml down --remove-orphans
