@@ -123,3 +123,50 @@ low-severity high-impact findings, and preservation of existing human gates.
 Do not claim full-repository acceptance before the CI matrix on this branch
 completes. The historical uploaded dead-code list is not a mandate to delete
 legacy functions or integrations; this PR intentionally removes none.
+
+
+## v1.1 offline approval and provider binding review (PR #1506)
+
+An additive file, `internal/defense/active_response_review.go`, extends the
+shadow-only flow with a local verification layer. It does not register a route,
+grant an execution permit, call a provider, or mutate existing database tables.
+
+### Review requirements
+
+- Re-run the original policy/evidence/asset planner and compare the complete
+  shadow plan against the verified result before evaluating any approvals.
+- Hash the exact defensive policy, trusted finding, request (including action
+  parameters), managed asset and shadow plan into a domain-separated SHA-256
+  review digest. **The digest is not an authorization token.**
+- Require an enabled provider binding with an exact matching tenant, managed
+  target, action and capability. These declarations MUST be obtained from a
+  trusted registry and are not provider-side proof of ownership.
+- Use Ed25519 signatures from pre-enrolled, server-side trusted approver public
+  keys; a request must not supply its own trust anchors.
+- Bind each signature to the plan digest, signer identity, issuance and
+  expiration; maximum approval validity is five minutes.
+- Require at least two distinct signing-key IDs for high-impact actions and
+  one for other actions if the existing policy/asset requires human approval.
+  A deployment must additionally verify those key IDs belong to separate
+  independently authenticated human operators; two keys alone are not proof
+  of two different people.
+- Reject altered signatures, expired approvals, duplicate signer IDs, disabled
+  or cross-tenant bindings and mutated plans.
+
+The only successful status is `ready_for_manual_integration`. The resulting
+`execution_performed` field is **always false**. No live action is exposed.
+A durable action ledger, trusted approver identities, replay prevention,
+provider-authority attestation, rollback, independent observed-effect
+evidence and authorization to execute remain deployment prerequisites.
+
+### Validation
+
+```bash
+cd koschei/api
+go test ./internal/defense -run 'TestActiveResponse' -count=1
+gofmt -l internal/defense/active_response*.go
+```
+
+This is an additional offline admission check, not an operational SLA, a
+functional DDoS blackholing implementation, an on-chain pause authority, or
+a provider integration.
