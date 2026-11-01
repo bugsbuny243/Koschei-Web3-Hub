@@ -344,7 +344,7 @@ func (h *securityRadarGapHealer) persistReplayEntries(ctx context.Context, sourc
 		if exists {
 			continue
 		}
-		_, err = h.Store.InsertStreamEvent(ctx, SecurityRadarStreamEventRecord{
+		insertedID, err := h.Store.InsertSignatureJournalEvent(ctx, SecurityRadarStreamEventRecord{
 			Provider:        "solana_rpc_gap_healer",
 			StreamMode:      "gap_replay",
 			Network:         h.Network,
@@ -375,7 +375,9 @@ func (h *securityRadarGapHealer) persistReplayEntries(ctx context.Context, sourc
 		if err != nil {
 			return recovered, skippedFailed, err
 		}
-		recovered++
+		if insertedID != "" {
+			recovered++
+		}
 	}
 	return recovered, skippedFailed, nil
 }
