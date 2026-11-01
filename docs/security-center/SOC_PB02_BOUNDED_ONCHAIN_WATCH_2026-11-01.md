@@ -61,7 +61,7 @@ watermark cannot be reached within 20 signatures, status becomes
 resolve the gap; the system must not claim full coverage. The first
 bootstrap window, when full, is explicitly marked
 `bootstrap_window_only` so the earlier unsampled history is not
-silently labelled caught-up. A duplicate observation is not a new attack.
+silently labelled caught-up. The durable `initial_window_truncated` flag remains true through subsequent successful polls, so an older unsampled history gap cannot be erased. A duplicate observation is not a new attack.
 
 ## Acceptance and operational limits
 
