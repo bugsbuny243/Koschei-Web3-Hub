@@ -11,9 +11,9 @@ import (
 const ActiveResponseRecoverySchemaVersion = "koschei-active-response-recovery-v1"
 
 const (
-	ActiveResponseRecoveryBlocked  = "blocked"
-	ActiveResponseRecoveryReview   = "ready_for_staging_review"
-	ActiveResponseRecoveryManual   = "manual_recovery_review"
+	ActiveResponseRecoveryBlocked = "blocked"
+	ActiveResponseRecoveryReview  = "ready_for_staging_review"
+	ActiveResponseRecoveryManual  = "manual_recovery_review"
 )
 
 // ActiveResponseRecoveryCapability is supplied by a trusted inventory of
