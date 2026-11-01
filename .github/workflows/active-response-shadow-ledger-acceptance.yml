@@ -1,0 +1,69 @@
+name: Active Response Shadow Ledger PostgreSQL Acceptance
+
+on:
+  pull_request:
+    paths:
+      - 'koschei/api/internal/defense/active_response*.go'
+      - 'docs/security-center/ACTIVE_RESPONSE_LEDGER_STAGING_V1.sql'
+      - '.github/workflows/active-response-shadow-ledger-acceptance.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: active-response-shadow-ledger-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  isolated-shadow-ledger:
+    name: PostgreSQL 17 isolated shadow ledger acceptance
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: koschei_shadow_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d koschei_shadow_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    defaults:
+      run:
+        working-directory: koschei/api
+    env:
+      PGPASSWORD: postgres
+      SHADOW_STAGING_TEST_DSN: postgres://postgres:postgres@127.0.0.1:5432/koschei_shadow_test?sslmode=disable
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up pinned Go toolchain
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: koschei/api/go.mod
+          cache-dependency-path: koschei/api/go.sum
+      - name: Download Go modules
+        run: go mod download
+      - name: Confirm isolated disposable database identity
+        run: |
+          set -euo pipefail
+          name="$(psql "${SHADOW_STAGING_TEST_DSN}" --set=ON_ERROR_STOP=1 --tuples-only --no-align --command='SELECT current_database()')"
+          test "${name}" = "koschei_shadow_test"
+      - name: Install manually specified shadow schema into disposable CI database
+        run: |
+          set -euo pipefail
+          psql "${SHADOW_STAGING_TEST_DSN}" --set=ON_ERROR_STOP=1 \
+            --file="../../docs/security-center/ACTIVE_RESPONSE_LEDGER_STAGING_V1.sql"
+      - name: Run offline defensive unit tests
+        run: go test ./internal/defense -run '^TestActiveResponse' -count=1
+      - name: Run isolated PostgreSQL shadow acceptance and concurrency tests
+        env:
+          KOSCHEI_ACTIVE_RESPONSE_STAGING_TEST_DATABASE_URL: ${{ env.SHADOW_STAGING_TEST_DSN }}
+        run: go test ./internal/defense -run '^TestActiveResponsePostgresStagingLedger' -count=1 -v
