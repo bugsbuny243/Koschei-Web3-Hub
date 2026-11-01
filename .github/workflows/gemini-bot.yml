@@ -1,0 +1,38 @@
+name: Gemini Code Reviewer
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  gemini-review:
+  runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Google GenAI SDK
+        run: pip install google-genai
+
+      - name: Run Gemini Script
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          python -c "
+          from google import genai
+          import os
+          
+          client = genai.Client(api_key=os.environ['GEMINI_API_KEY'])
+          response = client.models.generate_content(
+              model='gemini-3.8-flash', # Veya güncel argon/model tanımlayıcısı
+              contents='Bu reponun güvenlik ve kod kalitesi açısından genel bir incelemesini yap.'
+          )
+          print(response.text)
+          "
