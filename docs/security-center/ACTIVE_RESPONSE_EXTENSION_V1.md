@@ -442,3 +442,39 @@ credentials in its operator-controlled secrets service, enforce restricted
 network access and PostgreSQL role membership, and independently review
 schema ownership and protected checkpoint storage. No such production
 installation is performed or authorized by this PR.
+
+## v1.9 read-only reconciliation after ambiguous storage outcomes
+
+`InspectShadowLedgerReceipt` adds a side-effect-free query for a single
+tenant/action on the configured PostgreSQL database. Its trusted caller must
+supply the expected tenant, target, provider and plan digest from authoritative
+records. A single `FULL OUTER JOIN` observes both shadow plan and audit rows,
+rejects partial/mismatched records, and recomputes the content-bound SHA-256
+hash for a complete record.
+
+The result states are deliberately conservative:
+
+- `shadow_receipt_consistent`: a locally consistent plan and audit receipt
+  was found under the expected scope and digest. It proves **neither** a
+  provider effect **nor** the entire historical chain without a separately
+  verified checkpoint.
+- `shadow_receipt_absent_unconfirmed`: the consulted data source returned
+  no matching row. This is **not** proof of a failed commit, nor permission to
+  resend the action, especially if the source is a lagging replica.
+- `shadow_receipt_unverified` with an error: failed query, canceled request,
+  malformed scope, partial row, conflicting digest or hash corruption.
+  Fail closed. There is no automatic retry of ambiguous writes.
+
+The opt-in PostgreSQL acceptance suite checks consistent, absent and
+conflicting receipts. A further disposable **backend session-termination**
+test records a shadow action, terminates an owned test session with
+`pg_terminate_backend`, then checks a new connection can still reconcile
+the already committed receipt. This is **not** a database host outage,
+failover, crash during COMMIT, or distributed durability test. Those cases
+remain separate acceptance requirements. The test DSN is restricted to
+loopback `127.0.0.1:5432/koschei_shadow_test`, so the session termination
+test cannot intentionally target a remote service.
+
+No production connection, API route, worker, transaction dispatch or
+provider adapter uses this reader. Storage receipt reconciliation is
+read-only and does not authorize live defensive actions.
