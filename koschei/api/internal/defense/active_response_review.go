@@ -161,6 +161,7 @@ func ReviewActiveResponse(
 		out.RequiredApprovals = 1
 	}
 	seen := make(map[string]struct{}, len(approvals))
+	seenKeys := make(map[string]struct{}, len(approvals))
 	for _, approval := range approvals {
 		if _, duplicate := seen[approval.ApproverID]; duplicate {
 			out.Reason = "duplicate human approver"
@@ -178,6 +179,14 @@ func ReviewActiveResponse(
 			out.Reason = "invalid signed approval"
 			return out
 		}
+		// Two different registry IDs backed by one signing key do not count
+		// as two independently controlled approval credentials.
+		keyFingerprint := string(key)
+		if _, duplicate := seenKeys[keyFingerprint]; duplicate {
+			out.Reason = "duplicate human approval key"
+			return out
+		}
+		seenKeys[keyFingerprint] = struct{}{}
 		out.VerifiedApprovals++
 	}
 	if out.VerifiedApprovals < out.RequiredApprovals {
