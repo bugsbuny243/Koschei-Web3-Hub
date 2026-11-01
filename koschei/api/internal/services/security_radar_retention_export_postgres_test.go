@@ -179,3 +179,71 @@ func TestRetentionArchiveExportPostgres17(t *testing.T) {
 		t.Fatalf("unexpected post-prune restore acceptance: %+v", restoreResult)
 	}
 }
+
+// This regression reproduces the production missing-S3-endpoint failure with
+// inert CI credentials. The worker must publish a durable, scrubbed halted
+// state and must never enter source-table deletion on failed archive preflight.
+func TestRetentionV2ArchivePreflightFailureRecordsHaltPostgres17(t *testing.T) {
+	databaseURL := os.Getenv("KOSCHEI_TEST_DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("KOSCHEI_TEST_DATABASE_URL is not set")
+	}
+	t.Setenv("KOSCHEI_RADAR_ARCHIVE_EXPORT_SINK", "s3")
+	t.Setenv("KOSCHEI_RADAR_ARCHIVE_EXPORT_S3_ENDPOINT", "")
+	t.Setenv("KOSCHEI_RADAR_ARCHIVE_EXPORT_S3_BUCKET", "ci-synthetic-bucket")
+	t.Setenv("KOSCHEI_RADAR_ARCHIVE_EXPORT_S3_ACCESS_KEY_ID", "ci-synthetic-key")
+	t.Setenv("KOSCHEI_RADAR_ARCHIVE_EXPORT_S3_SECRET_ACCESS_KEY", "ci-synthetic-secret")
+
+	db, err := sql.Open("postgres", databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := db.PingContext(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	// Use a deliberately unusual cutoff age to scope the inserted ledger row,
+	// without touching any real retained sources. No external S3 call occurs.
+	const cutoffDays = 317
+	lower := time.Now().UTC().AddDate(0, 0, -cutoffDays).Add(-time.Minute)
+	upper := time.Now().UTC().AddDate(0, 0, -cutoffDays).Add(time.Minute)
+	worker := &securityRadarRetentionWorkerV2{base: &securityRadarRetentionWorker{
+		db: db, days: cutoffDays, interval: 12 * time.Hour,
+	}}
+	worker.runOnce(ctx)
+
+	var runID, status, haltReason string
+	var selected, archived, verified, deleted, pruned int64
+	err = db.QueryRowContext(ctx, `
+		SELECT id::text,status,COALESCE(detail->>'halt_reason',''),
+		       selected_rows,archived_rows,verified_rows,deleted_rows,pruned_rows
+		FROM radar_retention_runs
+		WHERE cutoff BETWEEN $1 AND $2
+		  AND detail->>'halt_reason'='archive_export_preflight_failed'
+		ORDER BY started_at DESC,id DESC
+		LIMIT 1
+	`, lower, upper).Scan(&runID, &status, &haltReason, &selected, &archived, &verified, &deleted, &pruned)
+	if err != nil {
+		t.Fatalf("archive preflight failure did not persist a halted run: %v", err)
+	}
+	t.Cleanup(func() {
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cleanupCancel()
+		if _, err := db.ExecContext(cleanupCtx, "DELETE FROM radar_retention_runs WHERE id=$1::uuid", runID); err != nil {
+			t.Logf("clean up isolated retention CI run: %v", err)
+		}
+	})
+	if status != "halted" || haltReason != "archive_export_preflight_failed" {
+		t.Fatalf("unsafe archive failure status=%q reason=%q", status, haltReason)
+	}
+	if selected != 0 || archived != 0 || verified != 0 || deleted != 0 || pruned != 0 {
+		t.Fatalf("preflight failure processed source rows: selected=%d archived=%d verified=%d deleted=%d pruned=%d",
+			selected, archived, verified, deleted, pruned)
+	}
+	if strings.Contains(strings.ToLower(haltReason), "ci-synthetic") {
+		t.Fatal("archive failure ledger must not leak sink credentials")
+	}
+}
