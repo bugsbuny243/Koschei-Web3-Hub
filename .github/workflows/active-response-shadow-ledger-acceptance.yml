@@ -61,6 +61,37 @@ jobs:
           set -euo pipefail
           psql "${SHADOW_STAGING_TEST_DSN}" --set=ON_ERROR_STOP=1 \
             --file="../../docs/security-center/ACTIVE_RESPONSE_LEDGER_STAGING_V1.sql"
+      - name: Create least-privilege writer in disposable test database
+        run: |
+          set -euo pipefail
+          psql "${SHADOW_STAGING_TEST_DSN}" --set=ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE koschei_shadow_ci_writer LOGIN PASSWORD 'ci-local-shadow-test-only';
+          GRANT CONNECT ON DATABASE koschei_shadow_test TO koschei_shadow_ci_writer;
+          GRANT USAGE ON SCHEMA public TO koschei_shadow_ci_writer;
+          GRANT SELECT, INSERT ON TABLE
+            koschei_active_response_shadow_plans,
+            koschei_active_response_shadow_audit
+            TO koschei_shadow_ci_writer;
+          GRANT USAGE, SELECT ON SEQUENCE koschei_active_response_shadow_audit_sequence_id_seq
+            TO koschei_shadow_ci_writer;
+          DO $
+          BEGIN
+            IF has_table_privilege('koschei_shadow_ci_writer',
+                    'koschei_active_response_shadow_plans', 'UPDATE') OR
+               has_table_privilege('koschei_shadow_ci_writer',
+                    'koschei_active_response_shadow_plans', 'DELETE') OR
+               has_table_privilege('koschei_shadow_ci_writer',
+                    'koschei_active_response_shadow_audit', 'UPDATE') OR
+               has_table_privilege('koschei_shadow_ci_writer',
+                    'koschei_active_response_shadow_audit', 'DELETE') THEN
+              RAISE EXCEPTION 'staging writer must not have UPDATE or DELETE rights';
+            END IF;
+          END $;
+          SQL
+      - name: Verify shadow ledger with unprivileged writer credentials
+        env:
+          KOSCHEI_ACTIVE_RESPONSE_STAGING_TEST_DATABASE_URL: postgres://koschei_shadow_ci_writer:ci-local-shadow-test-only@127.0.0.1:5432/koschei_shadow_test?sslmode=disable
+        run: go test ./internal/defense -run '^TestActiveResponsePostgresStagingLedger' -count=1 -v
       - name: Run offline defensive unit tests
         run: go test ./internal/defense -run '^TestActiveResponse' -count=1
       - name: Run isolated PostgreSQL shadow acceptance and concurrency tests
