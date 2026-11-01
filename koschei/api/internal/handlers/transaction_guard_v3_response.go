@@ -91,6 +91,13 @@ func (h *Handler) finishTransactionGuardV3ResponseWithWitness(w http.ResponseWri
 	confirmedIncidentCorpus := h.collectTransactionGuardConfirmedIncidentCorpus(r.Context(), input.Network, fingerprint, decoded, input.Wallet)
 	attackPath := buildTransactionGuardAttackPaths(input.Wallet, assessment, decoded, cpiFlow, authoritySurface)
 	unifiedSecurity := buildTransactionGuardUnifiedSecurityProjection(input, requestID, fingerprint, authoritySurface, attackPath, time.Now().UTC())
+	socPB02 := buildTransactionGuardSOCPlaybook02(assessment, decoded, cpiFlow, authoritySurface)
+	// A proven authority mutation must never generate an ALLOW permit even if
+	// some unrelated scoring policy changes its thresholds in the future.
+	if (socPB02.Severity == "high" || socPB02.Severity == "critical") && assessment.Action == "allow" {
+		assessment.Action, assessment.RiskLevel = "withhold", "unknown"
+		assessment.Summary = "SOC-PB-02 observed a prospective authority change; do not sign before operator review."
+	}
 	originalAction := assessment.Action
 	assessment, enforcement := applyTransactionGuardEnforcementRequirementWithWitness(input, requestID, assessment, guardComplete, time.Now().UTC(), &stateWitness)
 	if originalAction == "allow" && assessment.Action != "allow" && alertID == "" {
@@ -122,6 +129,7 @@ func (h *Handler) finishTransactionGuardV3ResponseWithWitness(w http.ResponseWri
 		"attack_path_complete":                attackPath.Complete,
 		"attack_path":                         attackPath,
 		"unified_security_contract":           unifiedSecurity,
+		"soc_pb02_detection":                  socPB02,
 		"transaction_value_evidence_complete": valueEvidence.Complete,
 		"transaction_value_evidence":          valueEvidence,
 		"program_trust_graph_complete":        programTrustGraph.Complete,
