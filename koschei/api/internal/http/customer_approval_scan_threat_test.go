@@ -71,3 +71,26 @@ func TestCustomerApprovalResultRunsPB03OnObservedRPCResponse(t *testing.T) {
 		t.Fatalf("missing authority on finite allowance incorrectly marked clear: %+v", incomplete)
 	}
 }
+
+func TestCustomerApprovalRPCEndpointPrefersExplicitAndFailsClosed(t *testing.T) {
+	t.Setenv("ETHEREUM_RPC_URL", "")
+	t.Setenv("BASE_RPC_URL", "")
+	t.Setenv("ALCHEMY_API_KEY", "already-configured-key_123")
+	if got := customerApprovalRPCEndpoint("ethereum-mainnet"); got != "https://eth-mainnet.g.alchemy.com/v2/already-configured-key_123" {
+		t.Fatalf("existing Alchemy configuration was not selected: %q", got)
+	}
+	if got := customerApprovalRPCEndpoint("base-mainnet"); got != "" {
+		t.Fatalf("unverified non-Ethereum Alchemy fallback was promoted: %q", got)
+	}
+	t.Setenv("ETHEREUM_RPC_URL", "https://explicit.example/rpc")
+	if got := customerApprovalRPCEndpoint("ethereum-mainnet"); got != "https://explicit.example/rpc" {
+		t.Fatalf("explicit RPC endpoint was overridden: %q", got)
+	}
+	t.Setenv("ETHEREUM_RPC_URL", "")
+	for _, invalid := range []string{"", " path ", "abc/../def", "key?secret", "newline\nvalue"} {
+		t.Setenv("ALCHEMY_API_KEY", invalid)
+		if got := customerApprovalRPCEndpoint("ethereum-mainnet"); got != "" {
+			t.Fatalf("unsafe or missing RPC key accepted: %q", got)
+		}
+	}
+}
