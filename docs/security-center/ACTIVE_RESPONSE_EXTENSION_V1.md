@@ -267,3 +267,42 @@ exercises offline ledger entry hashing, invalid state rejection and no-storage
 fail-closed behavior. PostgreSQL-specific transaction, concurrency, schema
 permissions and outage/failover acceptance tests must run in a dedicated
 staging environment before this code is used to store real security events.
+
+## v1.4 independently anchored ledger verification and verified ingress
+
+Added `active_response_ledger_integrity.go` and
+`active_response_ledger_verified.go` as **offline, non-routed** modules.
+
+- `VerifyShadowLedgerSnapshot` checks an ordered, single-tenant audit
+  interval against **separately trusted** checkpoint root and head hashes.
+  It recomputes each v1 SHA-256 chain digest, checks link continuity,
+  rejects duplicate action IDs and chain hashes, rejects tampered scope,
+  timestamps and content, and never reports live execution. The caller must
+  load records in canonical database sequence order.
+- This check **does not** establish authenticity if the expected checkpoint
+  hashes come from the same potentially modified database. Publish and
+  protect periodic checkpoint roots/heads independently. A verified subrange
+  does not prove the absence of records before or after the anchored range.
+- `PrepareVerifiedShadowLedger` recomputes the original action policy,
+  known-evidence matches, managed asset and provider binding, signed offline
+  human approvals, content-bound review digest and recovery preflight. It
+  rejects fabricated `ready` statuses instead of trusting caller-provided
+  review results. The surrounding service must still load every trust
+  anchor and asset record from authoritative, authenticated sources.
+- `RecordVerifiedShadowLedger` is the preferred optional staging write
+  entry point and invokes the existing shadow ledger only after this
+  recomputation. It is not wired to production routes, workers or startup.
+- Dual human approvals additionally require **distinct Ed25519 public keys**,
+  not only distinct registry IDs. Separate real-world operator identities
+  still require authoritative enrollment outside this module.
+
+### Acceptance and limitations
+
+The new tests exercise valid anchored snapshots, tampered payloads, altered
+timestamps, changed roots and heads, duplicate/disconnected events,
+foreign-tenant records, invalid or shared signing keys, untrusted evidence,
+disabled or misbound provider claims, invalid recovery attestations and
+storage-unavailable behavior. This does **not** replace a PostgreSQL
+integration test under concurrent writers, DB restarts and expired signing
+credentials. No live anti-replay execution ledger or provider effect has been
+implemented or enabled.
