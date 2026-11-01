@@ -7,6 +7,7 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -15,6 +16,30 @@ import (
 )
 
 const customerApprovalScanSchemaVersion = "koschei-approval-scan-v1"
+
+// The customer approval route has a read-only Ethereum fallback using the
+// existing configured Alchemy key. Provider and chain identity remain checked
+// by *every* ProbeEVM* call; an unsupported app key fails closed.
+// No RPC secret is ever included in a public response or a log.
+func customerApprovalRPCEndpoint(network string) string {
+	if endpoint := configuredEVMRPCEndpoint(network); endpoint != "" {
+		return endpoint
+	}
+	if network != "ethereum-mainnet" {
+		return ""
+	}
+	key := os.Getenv("ALCHEMY_API_KEY")
+	if len(key) == 0 || len(key) > 256 {
+		return ""
+	}
+	for _, char := range key {
+		if !(char >= 'a' && char <= 'z') && !(char >= 'A' && char <= 'Z') &&
+			!(char >= '0' && char <= '9') && char != '_' && char != '-' {
+			return ""
+		}
+	}
+	return "https://eth-mainnet.g.alchemy.com/v2/" + key
+}
 
 type customerApprovalScanRequest struct {
 	Network string `json:"network"`
@@ -104,7 +129,7 @@ func customerApprovalScanWithRPCClient(w http.ResponseWriter, r *http.Request, c
 		writeCustomerApprovalScanError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	endpoint := configuredEVMRPCEndpoint(request.Network)
+	endpoint := customerApprovalRPCEndpoint(request.Network)
 	if endpoint == "" {
 		writeCustomerApprovalScanError(w, http.StatusServiceUnavailable, "evm_rpc_configuration_required")
 		return
