@@ -93,15 +93,15 @@ func TestActiveResponsePostgresStagingLedgerAcceptance(t *testing.T) {
 	var entry ActiveResponseLedgerEntry
 	entry.SchemaVersion = ActiveResponseLedgerSchemaVersion
 	entry.TenantID = tenant
-	if err := db.QueryRowContext(ctx,
+	row := db.QueryRowContext(ctx,
 		`SELECT p.action_id,p.target_id,p.provider_id,p.plan_digest,a.previous_hash,
 			a.chain_hash,a.recorded_at
 		  FROM koschei_active_response_shadow_plans p
 		  JOIN koschei_active_response_shadow_audit a
 		    ON a.tenant_id=p.tenant_id AND a.action_id=p.action_id
-		  WHERE p.tenant_id=$1 AND p.action_id=$2`, tenant, input.Request.ActionID).
-		Scan(&entry.ActionID, &entry.TargetID, &entry.ProviderID,
-			&entry.PlanDigest, &entry.PreviousHash, &entry.ChainHash, &entry.RecordedAt); err != nil {
+		  WHERE p.tenant_id=$1 AND p.action_id=$2`, tenant, input.Request.ActionID)
+	if err := row.Scan(&entry.ActionID, &entry.TargetID, &entry.ProviderID,
+		&entry.PlanDigest, &entry.PreviousHash, &entry.ChainHash, &entry.RecordedAt); err != nil {
 		t.Fatal(err)
 	}
 	check, err := VerifyShadowLedgerSnapshot(tenant, []ActiveResponseLedgerEntry{entry}, entry.PreviousHash, first.ChainHash)
