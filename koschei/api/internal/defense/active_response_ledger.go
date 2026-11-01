@@ -2,10 +2,7 @@ package defense
 
 import (
 	"context"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -120,24 +117,11 @@ func BuildShadowLedgerEntry(
 		RecordedAt:         now.UTC(),
 		ExecutionPerformed: false,
 	}
-	canonical, err := json.Marshal(struct {
-		SchemaVersion string    `json:"schema_version"`
-		TenantID      string    `json:"tenant_id"`
-		ActionID      string    `json:"action_id"`
-		TargetID      string    `json:"target_id"`
-		ProviderID    string    `json:"provider_id"`
-		PlanDigest    string    `json:"plan_digest"`
-		PreviousHash  string    `json:"previous_hash"`
-		RecordedAt    time.Time `json:"recorded_at"`
-	}{
-		entry.SchemaVersion, entry.TenantID, entry.ActionID, entry.TargetID,
-		entry.ProviderID, entry.PlanDigest, entry.PreviousHash, entry.RecordedAt,
-	})
+	chainHash, err := shadowLedgerEntryHash(entry)
 	if err != nil {
-		return ActiveResponseLedgerEntry{}, fmt.Errorf("encode shadow ledger entry: %w", err)
+		return ActiveResponseLedgerEntry{}, fmt.Errorf("hash shadow ledger entry: %w", err)
 	}
-	hash := sha256.Sum256(append([]byte("koschei-shadow-ledger-chain-v1\n"), canonical...))
-	entry.ChainHash = "sha256:" + hex.EncodeToString(hash[:])
+	entry.ChainHash = chainHash
 	return entry, nil
 }
 
