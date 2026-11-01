@@ -96,6 +96,10 @@ jobs:
             echo "PASS ${migration}" >> "${result_file}"
           done
           cat "${result_file}"
+      - name: Verify bounded Solana authority watch on PostgreSQL 17
+        env:
+          KOSCHEI_TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/koschei_ci?sslmode=disable
+        run: go test -v ./internal/services -run '^TestAuthorityWatch(BootstrapHistoryGapPersistsPostgres17|PostgresAtomicCursorAndGap)$' -count=1
       - name: Verify Solana signature journal and gap replay on PostgreSQL 17
         env:
           KOSCHEI_TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/koschei_ci?sslmode=disable

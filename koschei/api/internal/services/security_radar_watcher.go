@@ -34,7 +34,11 @@ func StartSecurityRadarWatcher(ctx context.Context, db *sql.DB, _ *web3.SolanaRP
 	stopRetention := StartSecurityRadarRetentionWorkerV2(ctx, db)
 	stopCorpus := StartHolderConcentrationCorpusWorker(ctx, db)
 	stopStreamRecovery := StartArvisStreamRecovery(ctx, db)
+	// Independent, explicitly opted-in *bounded* account watcher. Does not
+	// require opening the unbounded raw WSS PostgreSQL journal.
+	stopAuthorityWatch := StartSolanaAuthorityWatchSensorIfEnabled(ctx, db)
 	stopDatabaseWorkers := func() {
+		stopAuthorityWatch()
 		stopStreamRecovery()
 		stopCorpus()
 		stopRetention()
