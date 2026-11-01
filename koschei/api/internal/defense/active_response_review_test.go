@@ -144,3 +144,20 @@ func TestActiveResponseApprovalSigningRejectsOversizedValidity(t *testing.T) {
 		t.Fatal("long-lived approval accepted")
 	}
 }
+
+
+func TestActiveResponseHighImpactRejectsTwoIDsSharingOneSigningKey(t *testing.T) {
+	policy, finding, req, asset, plan, provider := activeResponseReviewFixture(t, "bgp_blackhole", "protected_prefix")
+	now := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
+	digest, err := ActiveResponsePlanDigest(policy, finding, req, asset, plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	one, keyOne := signActiveResponseApproval(t, 31, "signer-one", digest, now)
+	two, keyTwo := signActiveResponseApproval(t, 31, "signer-two", digest, now)
+	keys := map[string]ed25519.PublicKey{"signer-one": keyOne, "signer-two": keyTwo}
+	review := ReviewActiveResponse(policy, finding, req, finding.EvidenceIDs, asset, plan, provider, []ActiveResponseApproval{one, two}, keys, now)
+	if review.Status != ActiveResponseReviewDenied || review.ExecutionPerformed {
+		t.Fatalf("reused credential accepted for dual approval: %+v", review)
+	}
+}
