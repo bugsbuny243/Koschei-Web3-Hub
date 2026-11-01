@@ -378,3 +378,43 @@ regression test checks that encoding a timestamp, round-tripping it
 through microsecond storage precision and hashing it again produces
 the same digest. Without this, nanosecond-level Go timestamps could
 produce false audit-integrity failures after database reads.
+
+
+## v1.7 isolated PostgreSQL concurrency and fail-closed checks
+
+The offline staging ledger now retries PostgreSQL SQLSTATE `40001`
+serialization failures for **at most five fresh transactions**, stopping on
+context cancellation. Uniqueness (`23505`), permission (`42501`),
+connection (`08006`) and ambiguous commit errors are **never retried**
+automatically, to avoid hiding conflicts or uncertain write outcomes.
+No side-effecting provider action is reachable from this retry path.
+
+New ordinary unit tests cover successful serialization retries, exhausted
+retries, cancellation before and during an attempt, terminal SQLSTATEs and
+a closed database handle. These run without database access.
+
+The additional opt-in staging test
+`TestActiveResponsePostgresStagingLedgerConcurrency` uses the same strict
+`current_database() = 'koschei_shadow_test'` guard and checks:
+
+- parallel distinct action IDs within one tenant, including serializable
+  retry handling;
+- concurrent duplicate requests: one inserted audit row and the rest
+  reported as duplicates;
+- an ordered SQL read-back of all resulting ledger rows and SHA-256 chain
+  verification.
+
+Run both staging acceptance tests **only** against the isolated disposable
+database provisioned manually with the staging SQL script:
+
+```bash
+cd koschei/api
+KOSCHEI_ACTIVE_RESPONSE_STAGING_TEST_DATABASE_URL='<dedicated-test-DSN>' \
+  go test ./internal/defense -run '^TestActiveResponsePostgresStagingLedger' -count=1 -v
+```
+
+The isolated PostgreSQL acceptance checks have been **implemented but not
+executed in this work session**. Production DB failover, operator privilege
+separation, independent long-term checkpoint storage and durable live
+execution replay claims remain unverified. CI without that variable simply
+skips these database-writing staging tests.
