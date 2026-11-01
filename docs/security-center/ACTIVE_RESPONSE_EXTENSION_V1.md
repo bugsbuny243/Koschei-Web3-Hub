@@ -306,3 +306,32 @@ storage-unavailable behavior. This does **not** replace a PostgreSQL
 integration test under concurrent writers, DB restarts and expired signing
 credentials. No live anti-replay execution ledger or provider effect has been
 implemented or enabled.
+
+## v1.5 signed checkpoints and safe staging write boundary
+
+`active_response_ledger_checkpoint.go` validates offline, externally
+retained Ed25519-signed checkpoint manifests that bind a tenant, chain
+root, chain head, record count, signer identity and UTC issuance timestamp.
+Signatures are checked against **server-supplied, independently managed**
+public keys. The verifier then checks each chain entry against both
+checkpoint hashes; changed rows, missing entries, mismatched tenants,
+unknown signers, future timestamps and forged signatures are rejected.
+
+This module **does not sign or publish checkpoints**, install keys, fetch
+ledger rows or certify the absence of missing *other* checkpoints. The
+checkpoint must be stored separately from the database, with controls
+against checkpoint deletion, substitution and rollback. A valid signature
+authenticates the declared snapshot, not a live provider action.
+
+The low-level `recordShadowLedger` database writer is **package-private**;
+only `RecordVerifiedShadowLedger` is an exported staging write entry point.
+It recomputes policy, trusted evidence, managed asset binding, Ed25519
+approvals and recovery prerequisites before calling the low-level writer.
+No route calls this function. Even this recomputation depends on trusted
+back-end loaders and must never receive caller-selected trust anchors.
+
+The additional tests assert checkpoint integrity, signature authenticity,
+record-count consistency, tenant boundaries, future-time rejection and
+low-level write fail-closed behavior. A **real PostgreSQL staging acceptance
+run**, independently protected checkpoint storage and a durable replay
+claim for any future live executor remain outstanding.
