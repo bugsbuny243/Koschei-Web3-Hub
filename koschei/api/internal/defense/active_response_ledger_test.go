@@ -95,3 +95,21 @@ func TestActiveResponseLedgerDoesNotWriteWithoutStorage(t *testing.T) {
 		t.Fatalf("nil DB must fail safely: %+v %v", result, err)
 	}
 }
+
+func TestActiveResponseLedgerNormalizesPostgresTimestampPrecision(t *testing.T) {
+	plan, review, recovery, now := activeResponseLedgerFixture(t)
+	nanos := now.Add(123456789 * time.Nanosecond)
+	entry, err := BuildShadowLedgerEntry(plan, review, recovery, "", nanos)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if entry.RecordedAt.Nanosecond()%1000 != 0 {
+		t.Fatalf("non-microsecond ledger timestamp: %s", entry.RecordedAt)
+	}
+	persistedTimestamp := time.UnixMicro(entry.RecordedAt.UnixMicro()).UTC()
+	entry.RecordedAt = persistedTimestamp
+	recomputed, err := shadowLedgerEntryHash(entry)
+	if err != nil || recomputed != entry.ChainHash {
+		t.Fatalf("PostgreSQL timestamp round-trip changed hash: %s != %s, %v", recomputed, entry.ChainHash, err)
+	}
+}
