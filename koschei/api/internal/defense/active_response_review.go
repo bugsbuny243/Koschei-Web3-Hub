@@ -88,6 +88,10 @@ func ActiveResponseApprovalSigningPayload(a ActiveResponseApproval) ([]byte, err
 	if strings.TrimSpace(a.ApproverID) == "" || !strings.HasPrefix(a.PlanDigest, "sha256:") || len(a.PlanDigest) != 71 {
 		return nil, errors.New("invalid approver or action plan digest")
 	}
+	rawDigest, err := hex.DecodeString(strings.TrimPrefix(a.PlanDigest, "sha256:"))
+	if err != nil || len(rawDigest) != sha256.Size {
+		return nil, errors.New("action plan digest must be a SHA-256 hex value")
+	}
 	if a.IssuedAt.IsZero() || a.ExpiresAt.IsZero() || !a.ExpiresAt.After(a.IssuedAt) ||
 		a.ExpiresAt.Sub(a.IssuedAt) > 5*time.Minute {
 		return nil, errors.New("approval validity must be at most five minutes")
