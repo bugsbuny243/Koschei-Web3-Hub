@@ -82,5 +82,5 @@ func RecordVerifiedShadowLedger(
 	if err != nil {
 		return ActiveResponseLedgerResult{}, err
 	}
-	return RecordShadowLedger(ctx, db, preflight.Plan, preflight.Review, preflight.Recovery, now)
+	return recordShadowLedger(ctx, db, preflight.Plan, preflight.Review, preflight.Recovery, now)
 }
