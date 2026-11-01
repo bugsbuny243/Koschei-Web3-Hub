@@ -25,6 +25,19 @@ func VerifyCurrentShadowLedgerCheckpoint(
 	trustedSigners map[string]ed25519.PublicKey,
 	now time.Time,
 ) (ActiveResponseLedgerIntegrity, error) {
+	return verifyCurrentShadowLedgerCheckpoint(ctx, db, checkpoint, trustedSigners, nil, now)
+}
+
+// verifyCurrentShadowLedgerCheckpoint keeps optional independent high-water
+// verification inside the SAME read-only MVCC transaction as all hash checks.
+func verifyCurrentShadowLedgerCheckpoint(
+	ctx context.Context,
+	db *sql.DB,
+	checkpoint ActiveResponseSignedCheckpoint,
+	trustedSigners map[string]ed25519.PublicKey,
+	fence *TrustedShadowLedgerHighWatermark,
+	now time.Time,
+) (ActiveResponseLedgerIntegrity, error) {
 	rejected := ActiveResponseLedgerIntegrity{
 		SchemaVersion:      ActiveResponseLedgerIntegritySchemaVersion,
 		TenantID:           checkpoint.TenantID,
@@ -51,6 +64,11 @@ func VerifyCurrentShadowLedgerCheckpoint(
 		len(checkpoint.Signature) != ed25519.SignatureSize ||
 		!ed25519.Verify(publicKey, payload, checkpoint.Signature) {
 		return rejected, errors.New("shadow ledger checkpoint signature not trusted")
+	}
+	if fence != nil {
+		if err := validateShadowLedgerHighWatermark(checkpoint, *fence, now); err != nil {
+			return rejected, fmt.Errorf("trusted shadow high-water mark rejected: %w", err)
+		}
 	}
 	if db == nil {
 		return rejected, errors.New("shadow checkpoint database unavailable")
@@ -116,6 +134,11 @@ func VerifyCurrentShadowLedgerCheckpoint(
 		})
 		if len(entries) > checkpoint.RecordCount {
 			err = errors.New("signed checkpoint is not the current complete tenant ledger")
+			break
+		}
+		if fence != nil && len(entries) == fence.RecordsVerified &&
+			entries[len(entries)-1].ChainHash != fence.ChainHash {
+			err = errors.New("trusted high-water chain anchor missing from checkpoint history")
 			break
 		}
 	}
