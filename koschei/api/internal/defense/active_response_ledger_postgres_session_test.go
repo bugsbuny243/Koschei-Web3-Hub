@@ -66,7 +66,7 @@ func TestActiveResponsePostgresStagingLedgerSessionLoss(t *testing.T) {
 	}
 	var terminated bool
 	if err := killer.QueryRowContext(ctx,
-		"SELECT pg_terminate_backend($1)", backendPID).Scan(&terminated); err != nil {
+		"SELECT pg_terminate_backend($1, 5000)", backendPID).Scan(&terminated); err != nil {
 		killer.Close()
 		t.Fatal(err)
 	}
