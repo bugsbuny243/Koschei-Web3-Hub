@@ -49,7 +49,7 @@ func ensureSecurityRadarReplayAnchors(ctx context.Context, healer *securityRadar
 			}
 			signature = strings.TrimSpace(page[0].Signature)
 			slot = page[0].Slot
-			if _, err := healer.Store.InsertStreamEvent(ctx, SecurityRadarStreamEventRecord{
+			if _, err := healer.Store.InsertSignatureJournalEvent(ctx, SecurityRadarStreamEventRecord{
 				Provider:        "solana_rpc_gap_healer",
 				StreamMode:      "gap_bootstrap_anchor",
 				Network:         healer.Network,
