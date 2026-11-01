@@ -245,49 +245,69 @@ func TestAuthorityWatchPostgresAtomicCursorAndGap(t *testing.T) {
 
 func TestAuthorityWatchBootstrapHistoryGapPersistsPostgres17(t *testing.T) {
 	dsn := os.Getenv("KOSCHEI_TEST_DATABASE_URL")
-	if dsn == "" { t.Skip("KOSCHEI_TEST_DATABASE_URL not configured") }
+	if dsn == "" {
+		t.Skip("KOSCHEI_TEST_DATABASE_URL not configured")
+	}
 	db, err := sql.Open("postgres", dsn)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer db.Close()
 	db.SetMaxOpenConns(1)
-	ctx, cancel := context.WithTimeout(context.Background(),30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	if err := db.PingContext(ctx); err != nil { t.Fatal(err) }
+	if err := db.PingContext(ctx); err != nil {
+		t.Fatal(err)
+	}
 	for _, statement := range []string{
 		"CREATE TEMP TABLE security_solana_authority_watch_cursors (LIKE public.security_solana_authority_watch_cursors INCLUDING ALL)",
 		"CREATE TEMP TABLE security_solana_authority_watch_observations (LIKE public.security_solana_authority_watch_observations INCLUDING ALL)",
 		"CREATE TEMP TABLE security_alert_events (LIKE public.security_alert_events INCLUDING ALL)",
 	} {
-		if _,err := db.ExecContext(ctx,statement);err!=nil {t.Fatal(err)}
+		if _, err := db.ExecContext(ctx, statement); err != nil {
+			t.Fatal(err)
+		}
 	}
 	watch := defaultRaydiumProgramID
 	recent := []SolanaSignatureInfo{}
-	for _,letter := range []string{"B","A","9","8","7","6","5","4","3","2"} {
-		recent = append(recent,SolanaSignatureInfo{
-			Signature: strings.Repeat(letter,87), Slot: 10000,
-			Err: map[string]any{"InstructionError":[]any{0,"Failed"}},
+	for _, letter := range []string{"B", "A", "9", "8", "7", "6", "5", "4", "3", "2"} {
+		recent = append(recent, SolanaSignatureInfo{
+			Signature: strings.Repeat(letter, 87), Slot: 10000,
+			Err: map[string]any{"InstructionError": []any{0, "Failed"}},
 		})
 	}
 	sensor := &solanaAuthorityWatchSensor{
-		DB:db,
-		FetchSignatures: func(_ context.Context,_ string,_ string,_ int)([]SolanaSignatureInfo,error) {
-			return recent,nil
+		DB: db,
+		FetchSignatures: func(_ context.Context, _ string, _ string, _ int) ([]SolanaSignatureInfo, error) {
+			return recent, nil
 		},
-		FetchTransaction: func(_ context.Context,_ string)(SolanaTransactionResult,error) {
+		FetchTransaction: func(_ context.Context, _ string) (SolanaTransactionResult, error) {
 			t.Fatal("failed signature must not trigger getTransaction")
-			return nil,errors.New("unexpected fetch")
+			return nil, errors.New("unexpected fetch")
 		},
 	}
-	if err := sensor.processAddress(ctx,watch);err!=nil {t.Fatal(err)}
+	if err := sensor.processAddress(ctx, watch); err != nil {
+		t.Fatal(err)
+	}
 	var status string
 	var truncated bool
-	if err := db.QueryRowContext(ctx,"SELECT status,initial_window_truncated FROM security_solana_authority_watch_cursors WHERE watch_address=$1",watch).Scan(&status,&truncated);err!=nil {t.Fatal(err)}
-	if status!="bootstrap_window_only" || !truncated {t.Fatalf("first full page lost initial history gap: %s %v",status,truncated)}
-	recent = []SolanaSignatureInfo{
-		{Signature:strings.Repeat("C",87),Slot:10001,Err:map[string]any{"InstructionError":[]any{0,"Failed"}}},
-		{Signature:strings.Repeat("B",87),Slot:10000},
+	if err := db.QueryRowContext(ctx, "SELECT status,initial_window_truncated FROM security_solana_authority_watch_cursors WHERE watch_address=$1", watch).Scan(&status, &truncated); err != nil {
+		t.Fatal(err)
 	}
-	if err := sensor.processAddress(ctx,watch);err!=nil {t.Fatal(err)}
-	if err := db.QueryRowContext(ctx,"SELECT status,initial_window_truncated FROM security_solana_authority_watch_cursors WHERE watch_address=$1",watch).Scan(&status,&truncated);err!=nil {t.Fatal(err)}
-	if status!="bootstrap_window_only" || !truncated {t.Fatalf("later polling silently erased the initial coverage gap: %s %v",status,truncated)}
+	if status != "bootstrap_window_only" || !truncated {
+		t.Fatalf("first full page lost initial history gap: %s %v", status, truncated)
+	}
+	recent = []SolanaSignatureInfo{
+		{Signature: strings.Repeat("C", 87), Slot: 10001, Err: map[string]any{"InstructionError": []any{0, "Failed"}}},
+		{Signature: strings.Repeat("B", 87), Slot: 10000},
+	}
+	if err := sensor.processAddress(ctx, watch); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRowContext(ctx, "SELECT status,initial_window_truncated FROM security_solana_authority_watch_cursors WHERE watch_address=$1", watch).Scan(&status, &truncated); err != nil {
+		t.Fatal(err)
+	}
+	if status != "bootstrap_window_only" || !truncated {
+		t.Fatalf("later polling silently erased the initial coverage gap: %s %v", status, truncated)
+	}
 }

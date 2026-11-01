@@ -35,8 +35,8 @@ type solanaAuthorityWatchFinding struct {
 }
 
 type solanaAuthorityWatchCursor struct {
-	Signature string
-	Slot      int64
+	Signature              string
+	Slot                   int64
 	InitialWindowTruncated bool
 }
 
