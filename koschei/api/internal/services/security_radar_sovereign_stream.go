@@ -215,7 +215,7 @@ func (w *securityRadarJournalStreamWorker) persistLoop(ctx context.Context) {
 func (w *securityRadarJournalStreamWorker) persistJournalEvent(ctx context.Context, event SecurityRadarStreamEventRecord) error {
 	backoff := 100 * time.Millisecond
 	for {
-		_, err := w.Store.InsertStreamEvent(ctx, event)
+		_, err := w.Store.InsertSignatureJournalEvent(ctx, event)
 		if err == nil {
 			return nil
 		}

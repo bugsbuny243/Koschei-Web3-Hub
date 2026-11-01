@@ -19,6 +19,12 @@ func StartSecurityRadarGapHealerIfEnabled(ctx context.Context, db *sql.DB) func(
 	if !securityRadarStreamEnabled() {
 		return func() {}
 	}
+	// Gap-replay is itself a write to the high-volume raw PostgreSQL journal.
+	// It must honor the same explicit production storage authorization.
+	if !securityRadarPostgresRawJournalAllowed() {
+		log.Printf("security radar slot gap healer not started: production raw journal storage is not approved")
+		return func() {}
+	}
 	rpcURL := resolveSecurityRadarRPCURL()
 	if strings.TrimSpace(rpcURL) == "" {
 		log.Printf("security radar slot gap healer not started: no Solana RPC URL could be resolved")
