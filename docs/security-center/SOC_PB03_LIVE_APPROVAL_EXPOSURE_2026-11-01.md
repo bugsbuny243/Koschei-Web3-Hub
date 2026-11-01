@@ -13,6 +13,14 @@ read-only JSON-RPC for an exact ERC-20 token + owner + spender:
 5. Independently validate these current observations and evaluate SOC-PB-03,
    returning result.threat_assessment in the **existing** approval scan v1 envelope.
 
+When ETHEREUM_RPC_URL is absent, this **one approval route** can use the
+already configured ALCHEMY_API_KEY to construct the Ethereum mainnet HTTPS
+endpoint. The app key must actually support that network; both allowance and
+spender probes verify eth_chainId independently. Unsupported keys and missing
+provider configuration remain errors, never a fabricated observation. This
+fallback does not start any continuous monitoring and does not activate the
+other network scanners.
+
 This is a **wired, demand-driven detection surface**, not a scheduled EVM
 mempool or full-chain attack detector. Its raw observation point is
 "latest", not an exact shared pinned block. Delegation presence is not proof
