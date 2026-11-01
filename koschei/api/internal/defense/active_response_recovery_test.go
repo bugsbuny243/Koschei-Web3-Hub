@@ -1,6 +1,7 @@
 package defense
 
 import (
+	"crypto/ed25519"
 	"testing"
 	"time"
 )
@@ -11,16 +12,20 @@ func activeResponseRecoveryFixture(t *testing.T, action, kind string) (
 	t.Helper()
 	policy, finding, req, asset, plan, provider := activeResponseReviewFixture(t, action, kind)
 	now := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
-	// Recovery tests evaluate an offline review snapshot. The high-impact
-	// approval tests separately prove the verifier rejects missing signatures.
-	review := ReviewActiveResponse(policy, finding, req, finding.EvidenceIDs, asset, plan, provider, nil, nil, now)
-	if review.Status == ActiveResponseReviewDenied {
-		t.Fatalf("invalid review setup: %+v", review)
+	digest, err := ActiveResponsePlanDigest(policy, finding, req, asset, plan)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if plan.RequiresHumanApproval {
-		review.Status = ActiveResponseReviewReady
-		review.RequiredApprovals = 2
-		review.VerifiedApprovals = 2
+	one, keyOne := signActiveResponseApproval(t, 11, "recovery-approver-one", digest, now)
+	two, keyTwo := signActiveResponseApproval(t, 12, "recovery-approver-two", digest, now)
+	keys := map[string]ed25519.PublicKey{
+		"recovery-approver-one": keyOne,
+		"recovery-approver-two": keyTwo,
+	}
+	approvals := []ActiveResponseApproval{one, two}
+	review := ReviewActiveResponse(policy, finding, req, finding.EvidenceIDs, asset, plan, provider, approvals, keys, now)
+	if review.Status != ActiveResponseReviewReady {
+		t.Fatalf("invalid signed review setup: %+v", review)
 	}
 	capability := ActiveResponseRecoveryCapability{
 		ProviderID:             provider.ProviderID,
