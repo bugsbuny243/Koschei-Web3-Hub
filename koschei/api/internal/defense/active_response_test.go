@@ -121,7 +121,6 @@ func TestActiveResponsePreservesExistingHumanGate(t *testing.T) {
 	}
 }
 
-
 func TestActiveResponseRejectsEmptyTargetAndLowSeverityHighImpact(t *testing.T) {
 	policy, finding, req, asset := activeResponseFixture("pause_contract", "smart_contract")
 	req.TargetID = ""
