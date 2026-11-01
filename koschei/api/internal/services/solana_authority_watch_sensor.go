@@ -287,28 +287,28 @@ func (w *solanaAuthorityWatchSensor) processAddress(ctx context.Context, address
 		// never silently lose the incident candidate after checkpoint advance.
 		if event.Severity == "high" || event.Severity == "critical" {
 			payload, marshalErr := json.Marshal(map[string]any{
-				"schema_version": "koschei.solana-authority-watch.v1",
-				"playbook_id": "SOC-PB-02",
-				"network": "solana-mainnet",
-				"signature": event.Signature,
-				"slot": event.Slot,
-				"instruction_scope": event.Scope,
-				"instruction_index": event.InstructionIndex,
-				"inner_index": event.InnerIndex,
-				"program_id": event.ProgramID,
-				"authority_type": event.AuthorityType,
-				"new_authority": event.NewAuthority,
+				"schema_version":     "koschei.solana-authority-watch.v1",
+				"playbook_id":        "SOC-PB-02",
+				"network":            "solana-mainnet",
+				"signature":          event.Signature,
+				"slot":               event.Slot,
+				"instruction_scope":  event.Scope,
+				"instruction_index":  event.InstructionIndex,
+				"inner_index":        event.InnerIndex,
+				"program_id":         event.ProgramID,
+				"authority_type":     event.AuthorityType,
+				"new_authority":      event.NewAuthority,
 				"transaction_sha256": event.TransactionSHA256,
-				"evidence_state": "confirmed_executed_transaction",
-				"enforcement_state": "not_connected",
-				"report_integrity": "unsigned_rpc_observation",
+				"evidence_state":     "confirmed_executed_transaction",
+				"enforcement_state":  "not_connected",
+				"report_integrity":   "unsigned_rpc_observation",
 			})
 			if marshalErr != nil {
 				return marshalErr
 			}
 			key := fmt.Sprintf("solana-authority-watch:%x", sha256.Sum256([]byte(
 				event.WatchAddress+"|"+event.Signature+"|"+event.Scope+"|"+
-				fmt.Sprintf("%d|%d", event.InstructionIndex, event.InnerIndex))))
+					fmt.Sprintf("%d|%d", event.InstructionIndex, event.InnerIndex))))
 			_, err = tx.ExecContext(ctx, `INSERT INTO security_alert_events
 				(source,event_type,severity,target,title,message,dedupe_key,payload)
 				VALUES ('solana_authority_watch','security.alert.created',$1,$2,
@@ -316,7 +316,7 @@ func (w *solanaAuthorityWatchSensor) processAddress(ctx context.Context, address
 				'Confirmed onchain token authority mutation. This is an exposure signal, not proof of unauthorized access or malicious intent.',
 				$3,$4::jsonb)
 				ON CONFLICT (dedupe_key) DO NOTHING`,
-				event.Severity,event.WatchAddress,key,string(payload))
+				event.Severity, event.WatchAddress, key, string(payload))
 			if err != nil {
 				return err
 			}

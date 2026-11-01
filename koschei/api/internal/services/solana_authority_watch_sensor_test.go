@@ -198,9 +198,11 @@ func TestAuthorityWatchPostgresAtomicCursorAndGap(t *testing.T) {
 			t.Fatal(err)
 		}
 		var alerts int
-		if err := db.QueryRowContext(ctx,"SELECT count(*) FROM security_alert_events WHERE source='solana_authority_watch'").Scan(&alerts);err!=nil {t.Fatal(err)}
-		if alerts!=1 {
-			t.Fatalf("high risk confirmed event did not create exactly one deduped owner SOC review alert: %d",alerts)
+		if err := db.QueryRowContext(ctx, "SELECT count(*) FROM security_alert_events WHERE source='solana_authority_watch'").Scan(&alerts); err != nil {
+			t.Fatal(err)
+		}
+		if alerts != 1 {
+			t.Fatalf("high risk confirmed event did not create exactly one deduped owner SOC review alert: %d", alerts)
 		}
 		if recorded != count || gotSig != watermark || gotStatus != status {
 			t.Fatalf("false evidence or cursor: count=%d sig=%s status=%s", recorded, gotSig, gotStatus)
