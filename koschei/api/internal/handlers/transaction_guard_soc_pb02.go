@@ -75,7 +75,7 @@ func buildTransactionGuardSOCPlaybook02(
 		if (event.ProgramID != guardV3SPLTokenProgramID &&
 			event.ProgramID != guardV3Token2022ProgramID) ||
 			(event.InstructionSource != "outer" && event.InstructionSource != "cpi") ||
-			(event.InstructionSource == "cpi" && !cpi.Available) ||
+			(event.InstructionSource == "cpi" && (!cpi.Available || !cpi.Complete)) ||
 			!looksLikeGuardPubkey(event.Account) {
 			complete = false
 			out.ReasonCodes = append(out.ReasonCodes, "PB02_AUTHORITY_EVENT_ORIGIN_INVALID")
