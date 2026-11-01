@@ -418,3 +418,27 @@ executed in this work session**. Production DB failover, operator privilege
 separation, independent long-term checkpoint storage and durable live
 execution replay claims remain unverified. CI without that variable simply
 skips these database-writing staging tests.
+
+## v1.8 least-privilege PostgreSQL acceptance
+
+The isolated GitHub Actions PostgreSQL 17 job additionally provisions a
+disposable `koschei_shadow_ci_writer` account with **SELECT and INSERT only**
+on the two shadow ledger tables, plus the necessary sequence access. The job
+explicitly confirms that this account has **neither UPDATE nor DELETE**
+permission. The complete sequential and concurrency acceptance tests run
+under that limited account as well as under the staging database owner.
+
+The low-level shadow writer now uses ordinary SELECT for duplicate checking:
+`SELECT FOR UPDATE` was unnecessary because a tenant-scoped PostgreSQL
+advisory transaction lock already serializes shadow appends, and it
+incorrectly required UPDATE privilege on append-only records. Serializable
+transactions still handle snapshot conflicts through the bounded
+SQLSTATE `40001` retry path.
+
+The test principal exists only inside the ephemeral CI PostgreSQL service.
+Its fixed password is **CI-only test data**, not a real service credential.
+A production-grade installation must instead provision unique short-lived
+credentials in its operator-controlled secrets service, enforce restricted
+network access and PostgreSQL role membership, and independently review
+schema ownership and protected checkpoint storage. No such production
+installation is performed or authorized by this PR.
