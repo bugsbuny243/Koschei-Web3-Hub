@@ -89,6 +89,18 @@ func TestActiveResponsePostgresStagingLedgerAcceptance(t *testing.T) {
 	if countPlans != 1 || countAudit != 1 {
 		t.Fatalf("duplicate shadow audit rows: plans=%d, audit=%d", countPlans, countAudit)
 	}
+	// The manually provisioned staging trigger must prohibit modifications,
+	// including a no-op UPDATE and a DELETE of an existing audit row.
+	if _, err := db.ExecContext(ctx,
+		"UPDATE koschei_active_response_shadow_audit SET chain_hash=chain_hash WHERE tenant_id=$1 AND action_id=$2",
+		tenant, input.Request.ActionID); err == nil {
+		t.Fatal("append-only audit row accepted an UPDATE")
+	}
+	if _, err := db.ExecContext(ctx,
+		"DELETE FROM koschei_active_response_shadow_audit WHERE tenant_id=$1 AND action_id=$2",
+		tenant, input.Request.ActionID); err == nil {
+		t.Fatal("append-only audit row accepted a DELETE")
+	}
 
 	var entry ActiveResponseLedgerEntry
 	entry.SchemaVersion = ActiveResponseLedgerSchemaVersion
