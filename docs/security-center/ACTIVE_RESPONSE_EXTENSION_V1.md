@@ -225,3 +225,45 @@ The new tests include recovery TTL, break-glass, tested rollback recency,
 separate recovery and observer IDs, cross-tenant bindings, signed witness
 tampering, freshness, coverage gaps, disagreement and prevention of false
 real-world effect claims.
+
+## v1.3 opt-in PostgreSQL shadow ledger (not automatically installed)
+
+`active_response_ledger.go` implements an **unwired, explicit-call-only**
+database repository for offline action-review records. The SQL schema lives at
+`docs/security-center/ACTIVE_RESPONSE_LEDGER_STAGING_V1.sql` rather than the
+production migration directory; therefore routine app startup and CI migration
+runners do not install or invoke it.
+
+The staging database installation must be explicitly reviewed by an
+administrator. After installation the opt-in repository:
+
+1. Requires an offline, unexecuted shadow plan, completed review and complete
+   recovery preflight. These are **not** authentication credentials; the
+   caller must obtain them from verified, trusted server-side sources.
+2. Opens a PostgreSQL serializable transaction, acquires a per-tenant
+   transaction-scoped advisory lock and checks the existing action ID.
+3. Returns `shadow_duplicate` for an exact re-submit without creating an
+   additional audit event; rejects action-ID collisions with different target,
+   provider or plan digest.
+4. Appends a `shadow_recorded` action and a SHA-256-linked audit entry
+   atomically. Both tables have tenant/action uniqueness; the SQL script
+   provides immutable-row triggers against UPDATE/DELETE operations.
+5. Fails closed on missing DB storage, malformed identifiers, invalid
+   review/recovery state or invalid chain hash. No provider command or
+   network operation is implemented.
+
+**Operational limits:** The hash chain depends on a trusted database, correct
+transaction isolation, append-only privileges and external periodic
+checkpoints. A database owner can disable triggers or delete the entire
+database; hashes alone do not make the ledger tamper-proof. Audit ordering is
+per tenant and must be independently reconciled. A duplicate result does
+not prove the caller's credentials or approvals are currently authorized.
+The adapter performs **audit persistence**, not anti-replay authorization for
+future live actions; a separate single-use execution claim ledger and
+idempotent provider adapters are still required before production use.
+
+Testing: `go test ./internal/defense -run 'TestActiveResponse' -count=1`
+exercises offline ledger entry hashing, invalid state rejection and no-storage
+fail-closed behavior. PostgreSQL-specific transaction, concurrency, schema
+permissions and outage/failover acceptance tests must run in a dedicated
+staging environment before this code is used to store real security events.
