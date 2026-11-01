@@ -145,7 +145,6 @@ func TestActiveResponseApprovalSigningRejectsOversizedValidity(t *testing.T) {
 	}
 }
 
-
 func TestActiveResponseHighImpactRejectsTwoIDsSharingOneSigningKey(t *testing.T) {
 	policy, finding, req, asset, plan, provider := activeResponseReviewFixture(t, "bgp_blackhole", "protected_prefix")
 	now := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
