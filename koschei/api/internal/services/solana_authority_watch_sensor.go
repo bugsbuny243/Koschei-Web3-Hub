@@ -14,39 +14,39 @@ import (
 )
 
 const (
-	solanaAuthorityWatchLimit = 10
-	solanaAuthorityWatchMaxPages = 2
+	solanaAuthorityWatchLimit        = 10
+	solanaAuthorityWatchMaxPages     = 2
 	solanaAuthorityWatchMaxAddresses = 3
 )
 
 type solanaAuthorityWatchFinding struct {
-	WatchAddress string
-	Signature string
-	Slot int64
-	Scope string
-	InstructionIndex int
-	InnerIndex int
-	ProgramID string
-	Account string
-	AuthorityType string
-	NewAuthority string
-	Severity string
+	WatchAddress      string
+	Signature         string
+	Slot              int64
+	Scope             string
+	InstructionIndex  int
+	InnerIndex        int
+	ProgramID         string
+	Account           string
+	AuthorityType     string
+	NewAuthority      string
+	Severity          string
 	TransactionSHA256 string
 }
 
 type solanaAuthorityWatchCursor struct {
 	Signature string
-	Slot int64
+	Slot      int64
 }
 
 type solanaAuthorityWatchSensor struct {
-	DB *sql.DB
-	RPCURL string
+	DB        *sql.DB
+	RPCURL    string
 	Addresses []string
-	Interval time.Duration
+	Interval  time.Duration
 	// Only tests replace these transport functions. Production uses the
 	// existing budgeted, SSRF-restricted Solana JSON-RPC client.
-	FetchSignatures func(context.Context, string, string, int) ([]SolanaSignatureInfo, error)
+	FetchSignatures  func(context.Context, string, string, int) ([]SolanaSignatureInfo, error)
 	FetchTransaction func(context.Context, string) (SolanaTransactionResult, error)
 }
 
@@ -231,7 +231,7 @@ func (w *solanaAuthorityWatchSensor) processAddress(ctx context.Context, address
 		collected = collected[:solanaAuthorityWatchLimit]
 	}
 	findings := make([]solanaAuthorityWatchFinding, 0)
-	for i := len(collected)-1; i >= 0; i-- {
+	for i := len(collected) - 1; i >= 0; i-- {
 		item := collected[i]
 		if item.Err != nil {
 			continue // failed transaction cannot mutate state; cursor still advances
@@ -275,9 +275,9 @@ func (w *solanaAuthorityWatchSensor) processAddress(ctx context.Context, address
 			 program_id,authority_account,authority_type,new_authority,severity,transaction_sha256)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
 			ON CONFLICT (watch_address,signature,instruction_scope,instruction_index,inner_index) DO NOTHING`,
-			event.WatchAddress,event.Signature,event.Slot,event.Scope,event.InstructionIndex,
-			event.InnerIndex,event.ProgramID,event.Account,event.AuthorityType,
-			event.NewAuthority,event.Severity,event.TransactionSHA256)
+			event.WatchAddress, event.Signature, event.Slot, event.Scope, event.InstructionIndex,
+			event.InnerIndex, event.ProgramID, event.Account, event.AuthorityType,
+			event.NewAuthority, event.Severity, event.TransactionSHA256)
 		if err != nil {
 			return err
 		}
@@ -331,9 +331,9 @@ func analyzeConfirmedSolanaAuthorityWatch(watch, signature string, slot int64, t
 	if err != nil || len(encoded) > 2<<20 {
 		return nil, errors.New("transaction evidence exceeded digest budget")
 	}
-	digest := fmt.Sprintf("%x",sha256.Sum256(encoded))
+	digest := fmt.Sprintf("%x", sha256.Sum256(encoded))
 	found := []solanaAuthorityWatchFinding{}
-	appendInstruction := func(raw any, scope string, i,j int) error {
+	appendInstruction := func(raw any, scope string, i, j int) error {
 		entry := asRadarMap(raw)
 		program := anyString(entry["programId"])
 		if program != splTokenProgramID && program != token2022ProgramID {
@@ -349,7 +349,9 @@ func analyzeConfirmedSolanaAuthorityWatch(watch, signature string, slot int64, t
 		}
 		info := asRadarMap(parsed["info"])
 		account := strings.TrimSpace(anyString(info["account"]))
-		if account == "" { account = strings.TrimSpace(anyString(info["mint"])) }
+		if account == "" {
+			account = strings.TrimSpace(anyString(info["mint"]))
+		}
 		if account == "" || !isLikelyRadarSolanaAddress(account) {
 			return errors.New("authority instruction account identity unavailable")
 		}
@@ -369,7 +371,7 @@ func analyzeConfirmedSolanaAuthorityWatch(watch, signature string, slot int64, t
 			return errors.New("SPL authority mutation type unavailable")
 		}
 		switch authorityType {
-		case "mintTokens","freezeAccount","accountOwner","closeAccount","permanentDelegate":
+		case "mintTokens", "freezeAccount", "accountOwner", "closeAccount", "permanentDelegate":
 		default:
 			return errors.New("unsupported SPL authority mutation type")
 		}
@@ -382,28 +384,37 @@ func analyzeConfirmedSolanaAuthorityWatch(watch, signature string, slot int64, t
 		} else if authorityType == "mintTokens" || authorityType == "freezeAccount" || authorityType == "permanentDelegate" {
 			severity = "critical"
 		}
-		found = append(found,solanaAuthorityWatchFinding{
-			WatchAddress: watch,Signature:signature,Slot:slot,Scope:scope,
-			InstructionIndex:i,InnerIndex:j,ProgramID:program,Account:account,
-			AuthorityType:authorityType,NewAuthority:newAuthority,
-			Severity:severity,TransactionSHA256:digest,
+		found = append(found, solanaAuthorityWatchFinding{
+			WatchAddress: watch, Signature: signature, Slot: slot, Scope: scope,
+			InstructionIndex: i, InnerIndex: j, ProgramID: program, Account: account,
+			AuthorityType: authorityType, NewAuthority: newAuthority,
+			Severity: severity, TransactionSHA256: digest,
 		})
-		if len(found)>32 { return errors.New("authority instruction count exceeds safe bound") }
+		if len(found) > 32 {
+			return errors.New("authority instruction count exceeds safe bound")
+		}
 		return nil
 	}
-	for i,v := range outer {
-		if err := appendInstruction(v,"outer",i,0); err != nil { return nil,err }
-	}
-	for _,rawGroup := range inner {
-		group := asRadarMap(rawGroup)
-		index := int(radarInt64(group["index"]))
-		if index<0 || index>=len(outer) { return nil,errors.New("invalid CPI instruction group index") }
-		entries,ok := group["instructions"].([]any)
-		if !ok { return nil,errors.New("CPI instruction group has missing entries") }
-		for j,v := range entries {
-			if err := appendInstruction(v,"cpi",index,j+1); err != nil { return nil,err }
+	for i, v := range outer {
+		if err := appendInstruction(v, "outer", i, 0); err != nil {
+			return nil, err
 		}
 	}
-	return found,nil
+	for _, rawGroup := range inner {
+		group := asRadarMap(rawGroup)
+		index := int(radarInt64(group["index"]))
+		if index < 0 || index >= len(outer) {
+			return nil, errors.New("invalid CPI instruction group index")
+		}
+		entries, ok := group["instructions"].([]any)
+		if !ok {
+			return nil, errors.New("CPI instruction group has missing entries")
+		}
+		for j, v := range entries {
+			if err := appendInstruction(v, "cpi", index, j+1); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return found, nil
 }
-
