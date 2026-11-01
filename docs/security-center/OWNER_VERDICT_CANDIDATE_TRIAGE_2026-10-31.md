@@ -32,8 +32,9 @@ proof of a failed database linkage.
 - Both endpoint and page use `no-store` / owner guards. The page
   treats 404/503, missing keys, corrupt signatures and missing schema
   as **unavailable**, not as an empty or healthy queue.
-- This does not extend the list past the latest 20 receipts or
-  assert the absence of older pending cases, complete coverage,
+- The default view remains the latest 20 receipts; historical pages are
+  available through the scoped cursor contract documented below. Neither
+  view asserts the absence of older pending cases, complete coverage,
   active SOC staffing, live customer→case acceptance or enforceable
   blockchain intervention.
 
