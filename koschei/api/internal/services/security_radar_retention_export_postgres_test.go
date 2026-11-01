@@ -229,13 +229,13 @@ func TestRetentionV2ArchivePreflightFailureRecordsHaltPostgres17(t *testing.T) {
 	if err != nil {
 		t.Fatalf("archive preflight failure did not persist a halted run: %v", err)
 	}
-	t.Cleanup(func() {
+	defer func() {
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cleanupCancel()
 		if _, err := db.ExecContext(cleanupCtx, "DELETE FROM radar_retention_runs WHERE id=$1::uuid", runID); err != nil {
 			t.Logf("clean up isolated retention CI run: %v", err)
 		}
-	})
+	}()
 	if status != "halted" || haltReason != "archive_export_preflight_failed" {
 		t.Fatalf("unsafe archive failure status=%q reason=%q", status, haltReason)
 	}
