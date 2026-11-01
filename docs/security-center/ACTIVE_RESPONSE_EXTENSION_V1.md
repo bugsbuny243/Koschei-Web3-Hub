@@ -478,3 +478,42 @@ test cannot intentionally target a remote service.
 No production connection, API route, worker, transaction dispatch or
 provider adapter uses this reader. Storage receipt reconciliation is
 read-only and does not authorize live defensive actions.
+
+## v2.0 independently signed full-tenant PostgreSQL snapshot verification
+
+`VerifyCurrentShadowLedgerCheckpoint` validates a trusted, separately
+retained Ed25519 signature over the **complete, genesis-to-tip** tenant ledger
+and compares the exact signed record count and chain head against a single
+PostgreSQL `REPEATABLE READ READ ONLY` transaction. It reads the audit
+sequence in order, joins each shadow plan to its audit event, rejects
+orphaned/mismatched plan and audit rows, then runs the existing complete
+SHA-256 chain and signed-checkpoint verification.
+
+Safeguards and boundaries:
+
+- Requires an independently trusted signer public key and an exact
+  `sha256:` + 64-zero genesis root. No arbitrary unanchored slice can
+  masquerade as a complete ledger.
+- Reads no more than the signed count plus one; extra records **reject**
+  a stale signature rather than silently accepting a historical checkpoint
+  as the current full tenant history. Missing records also reject.
+- Verifies audit and plan digests, hash and timestamp agreement, all chained
+  records, and the externally signed chain head. A read-only transaction
+  commits only after all checks pass.
+- Never obtains a checkpoint from the database being audited, never mints
+  a signature, never authorizes action execution and never invokes provider
+  adapters. The caller must authenticate tenant scope, select an
+  authoritative PostgreSQL primary and retrieve the independently stored
+  checkpoint and trusted key registry.
+- The snapshot is consistent at the point of its SQL read. A new append
+  *after* that snapshot is not observable and does not constitute a failure
+  of snapshot isolation. This is not proof that no later data exists, nor
+  proof against a compromised external signer/archival system.
+
+The disposable PostgreSQL staging acceptance now tests an authentic signed
+checkpoint, rejects tampered checkpoints and proves that a previously
+signed head fails after a second independently authorized shadow append.
+Offline tests reject untrusted signer identities, missing DB access,
+missing genesis, future-dated checkpoints and canceled verification.
+Real production provider execution, database promotion/failover and
+external durable checkpoint archival remain out of scope.
