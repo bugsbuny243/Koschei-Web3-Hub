@@ -63,18 +63,18 @@ func ActiveResponseWitnessSigningPayload(w ActiveResponseWitness) ([]byte, error
 		return nil, errors.New("witness identity, scope, state, timestamp and SHA-256 evidence are required")
 	}
 	return json.Marshal(struct {
-		SchemaVersion   string    `json:"schema_version"`
-		ObserverID      string    `json:"observer_id"`
-		ProviderID      string    `json:"provider_id"`
-		PlanDigest      string    `json:"plan_digest"`
-		ActionID        string    `json:"action_id"`
-		TenantID        string    `json:"tenant_id"`
-		TargetID        string    `json:"target_id"`
-		ObservedState   string    `json:"observed_state"`
-		EvidenceDigest  string    `json:"evidence_digest"`
-		ScopeComplete   bool      `json:"scope_complete"`
-		CoverageGaps    []string  `json:"coverage_gaps"`
-		ObservedAt      time.Time `json:"observed_at"`
+		SchemaVersion  string    `json:"schema_version"`
+		ObserverID     string    `json:"observer_id"`
+		ProviderID     string    `json:"provider_id"`
+		PlanDigest     string    `json:"plan_digest"`
+		ActionID       string    `json:"action_id"`
+		TenantID       string    `json:"tenant_id"`
+		TargetID       string    `json:"target_id"`
+		ObservedState  string    `json:"observed_state"`
+		EvidenceDigest string    `json:"evidence_digest"`
+		ScopeComplete  bool      `json:"scope_complete"`
+		CoverageGaps   []string  `json:"coverage_gaps"`
+		ObservedAt     time.Time `json:"observed_at"`
 	}{
 		ActiveResponseWitnessSchemaVersion,
 		w.ObserverID, w.ProviderID, w.PlanDigest, w.ActionID,
