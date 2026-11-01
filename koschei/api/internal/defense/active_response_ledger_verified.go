@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/lib/pq"
 )
 
 // TrustedShadowLedgerInputs must be constructed from an authenticated,
@@ -82,5 +84,35 @@ func RecordVerifiedShadowLedger(
 	if err != nil {
 		return ActiveResponseLedgerResult{}, err
 	}
-	return recordShadowLedger(ctx, db, preflight.Plan, preflight.Review, preflight.Recovery, now)
+	return retryShadowLedgerSerialization(ctx, func() (ActiveResponseLedgerResult, error) {
+		return recordShadowLedger(ctx, db, preflight.Plan, preflight.Review, preflight.Recovery, now)
+	})
+}
+
+// retryShadowLedgerSerialization retries only PostgreSQL 40001 errors, never
+// validation, uniqueness, permission, connection or ambiguous commit errors.
+// Each invocation of attempt creates its own transaction; no live provider
+// action is reachable. Context cancellation is always terminal.
+func retryShadowLedgerSerialization(
+	ctx context.Context,
+	attempt func() (ActiveResponseLedgerResult, error),
+) (ActiveResponseLedgerResult, error) {
+	const maxAttempts = 5
+	for n := 0; n < maxAttempts; n++ {
+		if err := ctx.Err(); err != nil {
+			return ActiveResponseLedgerResult{}, err
+		}
+		result, err := attempt()
+		if err == nil {
+			return result, nil
+		}
+		var pgErr *pq.Error
+		if !errors.As(err, &pgErr) || pgErr.Code != "40001" {
+			return ActiveResponseLedgerResult{}, err
+		}
+		if n == maxAttempts-1 {
+			return ActiveResponseLedgerResult{}, fmt.Errorf("shadow ledger serialization retries exhausted: %w", err)
+		}
+	}
+	return ActiveResponseLedgerResult{}, errors.New("shadow ledger retry guard rejected")
 }
