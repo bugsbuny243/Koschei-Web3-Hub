@@ -1,0 +1,25 @@
+# Keep secrets, local configurations, VCS, downloaded dependencies and
+# generated artifacts out of the Docker build context.
+.git
+.gitignore
+.github
+.env
+.env.*
+**/.env
+**/.env.*
+**/*.pem
+**/*.p12
+**/*.pfx
+**/id_rsa
+**/id_ed25519
+**/.aws
+**/.ssh
+**/.npmrc
+**/.netrc
+node_modules
+**/node_modules
+**/vendor
+**/dist
+**/coverage
+**/*.log
+tmp
