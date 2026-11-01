@@ -241,6 +241,24 @@ func TestAuthorityWatchPostgresAtomicCursorAndGap(t *testing.T) {
 		t.Fatal("RPC failure advanced cursor")
 	}
 	assertState(1, newer, "rpc_error")
+	// A successful empty poll must clear a recovered RPC error without
+	// changing the last proven watermark or replaying old observations.
+	signatures = []SolanaSignatureInfo{{Signature: newer, Slot: 123457}}
+	worker.FetchTransaction = func(_ context.Context, _ string) (SolanaTransactionResult, error) {
+		t.Fatal("idle recovery must not refetch the checkpointed transaction")
+		return nil, errors.New("unexpected getTransaction")
+	}
+	if err := worker.processAddress(ctx, watch); err != nil {
+		t.Fatal(err)
+	}
+	assertState(1, newer, "caught_up")
+	var lastError string
+	if err := db.QueryRowContext(ctx, "SELECT last_error FROM security_solana_authority_watch_cursors WHERE watch_address=$1", watch).Scan(&lastError); err != nil {
+		t.Fatal(err)
+	}
+	if lastError != "" {
+		t.Fatalf("healthy idle poll retained recovered RPC error: %q", lastError)
+	}
 }
 
 func TestAuthorityWatchBootstrapHistoryGapPersistsPostgres17(t *testing.T) {
@@ -309,5 +327,27 @@ func TestAuthorityWatchBootstrapHistoryGapPersistsPostgres17(t *testing.T) {
 	}
 	if status != "bootstrap_window_only" || !truncated {
 		t.Fatalf("later polling silently erased the initial coverage gap: %s %v", status, truncated)
+	}
+	// A temporary provider outage must not become a permanent stale error
+	// once an idle poll reaches the saved watermark again.
+	sensor.FetchSignatures = func(_ context.Context, _ string, _ string, _ int) ([]SolanaSignatureInfo, error) {
+		return nil, errors.New("temporary RPC outage")
+	}
+	if err := sensor.processAddress(ctx, watch); err == nil {
+		t.Fatal("missing expected transient RPC error")
+	}
+	sensor.FetchSignatures = func(_ context.Context, _ string, _ string, _ int) ([]SolanaSignatureInfo, error) {
+		return []SolanaSignatureInfo{{Signature: strings.Repeat("C", 87), Slot: 10001}}, nil
+	}
+	if err := sensor.processAddress(ctx, watch); err != nil {
+		t.Fatal(err)
+	}
+	var lastError string
+	if err := db.QueryRowContext(ctx, "SELECT status,initial_window_truncated,last_error FROM security_solana_authority_watch_cursors WHERE watch_address=$1", watch).
+		Scan(&status, &truncated, &lastError); err != nil {
+		t.Fatal(err)
+	}
+	if status != "bootstrap_window_only" || !truncated || lastError != "" {
+		t.Fatalf("idle recovery erased bootstrap gap or retained error: %s %v %q", status, truncated, lastError)
 	}
 }
