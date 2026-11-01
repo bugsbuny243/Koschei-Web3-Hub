@@ -367,3 +367,14 @@ rows; dispose of the dedicated test database after acceptance.
 behavior, DB failover, role-level permissions and independent off-database
 checkpoint archival. Do not equate this opt-in staging test with a completed
 production acceptance.
+
+
+### PostgreSQL timestamp precision integrity
+
+The shadow ledger writer normalizes `recorded_at` to UTC
+**microsecond precision** before calculating its SHA-256 chain hash,
+matching PostgreSQL `timestamptz` storage precision. An added
+regression test checks that encoding a timestamp, round-tripping it
+through microsecond storage precision and hashing it again produces
+the same digest. Without this, nanosecond-level Go timestamps could
+produce false audit-integrity failures after database reads.
