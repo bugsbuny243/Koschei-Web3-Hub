@@ -14,12 +14,12 @@ func activeResponseSignedCheckpointFixture(t *testing.T) (ActiveResponseSignedCh
 	private := ed25519.NewKeyFromSeed(bytes.Repeat([]byte{41}, ed25519.SeedSize))
 	cp := ActiveResponseSignedCheckpoint{
 		SchemaVersion: ActiveResponseCheckpointSchemaVersion,
-		TenantID: entry.TenantID,
-		StartHash: root,
-		EndHash: entry.ChainHash,
-		RecordCount: 1,
-		SignerID: "audit-checkpoint-signer",
-		IssuedAt: now,
+		TenantID:      entry.TenantID,
+		StartHash:     root,
+		EndHash:       entry.ChainHash,
+		RecordCount:   1,
+		SignerID:      "audit-checkpoint-signer",
+		IssuedAt:      now,
 	}
 	data, err := ActiveResponseCheckpointSigningPayload(cp)
 	if err != nil {
