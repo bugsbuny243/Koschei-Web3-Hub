@@ -6,6 +6,7 @@ on:
     paths:
       - ".github/workflows/soc-postgres-acceptance.yml"
       - "koschei/api/internal/handlers/owner_incident*.go"
+      - "koschei/api/scripts/verify-owner-soc-production-readiness*.mjs"
       - "koschei/api/internal/handlers/owner_soc_readiness*.go"
       - "koschei/api/internal/http/owner_soc_readiness_route_test.go"
       - "docs/security-center/OWNER_SOC_RUNTIME_READINESS_V1.md"
@@ -67,6 +68,11 @@ jobs:
           Path("/tmp/koschei-owner-soc-triage.js").write_text(source[start:end])
           PY
           node --check /tmp/koschei-owner-soc-triage.js
+      - name: Verify owner-only production read observation contract without network or secrets
+        run: |
+          set -euo pipefail
+          node --check scripts/verify-owner-soc-production-readiness.mjs
+          node --test scripts/verify-owner-soc-production-readiness.test.mjs
       - name: Apply existing PostgreSQL schema migrations to ephemeral test database
         env:
           PGPASSWORD: postgres
