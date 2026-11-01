@@ -61,7 +61,7 @@ type customerApprovalScanResult struct {
 	Reasons          []string                              `json:"reasons"`
 	SpenderAuthority *services.EVMSpenderAuthoritySnapshot `json:"spender_authority,omitempty"`
 	Exposure         customerApprovalExposure              `json:"exposure"`
-	ThreatAssessment services.SOCApprovalThreatAssessment   `json:"threat_assessment"`
+	ThreatAssessment services.SOCApprovalThreatAssessment  `json:"threat_assessment"`
 }
 
 type customerApprovalScanEnvelope struct {

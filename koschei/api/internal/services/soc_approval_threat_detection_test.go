@@ -10,9 +10,9 @@ import (
 func approvalDetectionTestObservation(amount string, unlimited bool) networktarget.EVMAllowanceProbeResult {
 	return networktarget.EVMAllowanceProbeResult{
 		Network: "ethereum-mainnet", Token: "0x1111111111111111111111111111111111111111",
-		Owner: "0x2222222222222222222222222222222222222222",
+		Owner:   "0x2222222222222222222222222222222222222222",
 		Spender: "0x3333333333333333333333333333333333333333",
-		Amount: amount, Unlimited: unlimited,
+		Amount:  amount, Unlimited: unlimited,
 		EvidenceStatus: "observed", LiveAvailability: "checked",
 	}
 }
@@ -21,8 +21,8 @@ func approvalDetectionTestAuthority() *EVMSpenderAuthoritySnapshot {
 	return &EVMSpenderAuthoritySnapshot{
 		Network: "ethereum-mainnet", Spender: "0x3333333333333333333333333333333333333333",
 		DelegationState: networktarget.EVMDelegationStateNotObserved,
-		ProxyState: networktarget.EVMProxyAuthorityNotObserved,
-		Trust: Web3TrustVector{Observed: true},
+		ProxyState:      networktarget.EVMProxyAuthorityNotObserved,
+		Trust:           Web3TrustVector{Observed: true},
 	}
 }
 
@@ -30,7 +30,7 @@ func TestSOCApprovalThreatDetectsCompoundExposureWithoutClaimingExploitOrEnforce
 	max := "115792089237316195423570985008687907853269984665640564039457584007913129639935"
 	tests := []struct {
 		name, amount, delegation, implementation, finding, severity string
-		unlimited bool
+		unlimited                                                   bool
 	}{
 		{"unlimited_delegated", max, "0x4444444444444444444444444444444444444444", "", "unlimited_allowance_with_mutable_spender_authority", "high", true},
 		{"unlimited_upgradeable", max, "", "0x5555555555555555555555555555555555555555", "unlimited_allowance_with_mutable_spender_authority", "high", true},
@@ -67,25 +67,45 @@ func TestSOCApprovalThreatDetectsCompoundExposureWithoutClaimingExploitOrEnforce
 func TestSOCApprovalThreatWithholdsOnMissingConflictingOrForgedEvidence(t *testing.T) {
 	max := "115792089237316195423570985008687907853269984665640564039457584007913129639935"
 	tests := []struct {
-		name string
+		name    string
 		prepare func(*networktarget.EVMAllowanceProbeResult, *EVMSpenderAuthoritySnapshot)
 		missing bool
 	}{
 		{"missing_authority", nil, true},
-		{"wrong_spender", func(_ *networktarget.EVMAllowanceProbeResult, a *EVMSpenderAuthoritySnapshot) { a.Spender = "0x7777777777777777777777777777777777777777" }, false},
-		{"wrong_network", func(_ *networktarget.EVMAllowanceProbeResult, a *EVMSpenderAuthoritySnapshot) { a.Network = "base-mainnet" }, false},
-		{"missing_observation", func(_ *networktarget.EVMAllowanceProbeResult, a *EVMSpenderAuthoritySnapshot) { a.Trust.Observed = false }, false},
-		{"fabricated_verified_authority", func(_ *networktarget.EVMAllowanceProbeResult, a *EVMSpenderAuthoritySnapshot) { a.Trust.Verified = true }, false},
+		{"wrong_spender", func(_ *networktarget.EVMAllowanceProbeResult, a *EVMSpenderAuthoritySnapshot) {
+			a.Spender = "0x7777777777777777777777777777777777777777"
+		}, false},
+		{"wrong_network", func(_ *networktarget.EVMAllowanceProbeResult, a *EVMSpenderAuthoritySnapshot) {
+			a.Network = "base-mainnet"
+		}, false},
+		{"missing_observation", func(_ *networktarget.EVMAllowanceProbeResult, a *EVMSpenderAuthoritySnapshot) {
+			a.Trust.Observed = false
+		}, false},
+		{"fabricated_verified_authority", func(_ *networktarget.EVMAllowanceProbeResult, a *EVMSpenderAuthoritySnapshot) {
+			a.Trust.Verified = true
+		}, false},
 		{"forged_unlimited_label", func(o *networktarget.EVMAllowanceProbeResult, _ *EVMSpenderAuthoritySnapshot) { o.Unlimited = false }, false},
 		{"negative_allowance", func(o *networktarget.EVMAllowanceProbeResult, _ *EVMSpenderAuthoritySnapshot) { o.Amount = "-1" }, false},
 		{"oversized_allowance", func(o *networktarget.EVMAllowanceProbeResult, _ *EVMSpenderAuthoritySnapshot) { o.Amount = max + "0" }, false},
-		{"unobserved_allowance", func(o *networktarget.EVMAllowanceProbeResult, _ *EVMSpenderAuthoritySnapshot) { o.EvidenceStatus = "unverified" }, false},
-		{"unavailable_allowance", func(o *networktarget.EVMAllowanceProbeResult, _ *EVMSpenderAuthoritySnapshot) { o.LiveAvailability = "unavailable" }, false},
-		{"unrecognized_delegation", func(_ *networktarget.EVMAllowanceProbeResult, a *EVMSpenderAuthoritySnapshot) { a.DelegationState = "claimed_delegation" }, false},
-		{"unbound_delegation", func(_ *networktarget.EVMAllowanceProbeResult, a *EVMSpenderAuthoritySnapshot) { a.DelegationState = networktarget.EVMDelegationStateObserved }, false},
-		{"empty_proxy_authority", func(_ *networktarget.EVMAllowanceProbeResult, a *EVMSpenderAuthoritySnapshot) { a.ProxyState = networktarget.EVMProxyAuthorityObserved }, false},
+		{"unobserved_allowance", func(o *networktarget.EVMAllowanceProbeResult, _ *EVMSpenderAuthoritySnapshot) {
+			o.EvidenceStatus = "unverified"
+		}, false},
+		{"unavailable_allowance", func(o *networktarget.EVMAllowanceProbeResult, _ *EVMSpenderAuthoritySnapshot) {
+			o.LiveAvailability = "unavailable"
+		}, false},
+		{"unrecognized_delegation", func(_ *networktarget.EVMAllowanceProbeResult, a *EVMSpenderAuthoritySnapshot) {
+			a.DelegationState = "claimed_delegation"
+		}, false},
+		{"unbound_delegation", func(_ *networktarget.EVMAllowanceProbeResult, a *EVMSpenderAuthoritySnapshot) {
+			a.DelegationState = networktarget.EVMDelegationStateObserved
+		}, false},
+		{"empty_proxy_authority", func(_ *networktarget.EVMAllowanceProbeResult, a *EVMSpenderAuthoritySnapshot) {
+			a.ProxyState = networktarget.EVMProxyAuthorityObserved
+		}, false},
 		{"bad_subject", func(o *networktarget.EVMAllowanceProbeResult, _ *EVMSpenderAuthoritySnapshot) { o.Token = "0xdead" }, false},
-		{"uppercase_subject_mismatch", func(o *networktarget.EVMAllowanceProbeResult, _ *EVMSpenderAuthoritySnapshot) { o.Owner = strings.ToUpper(o.Owner) }, false},
+		{"uppercase_subject_mismatch", func(o *networktarget.EVMAllowanceProbeResult, _ *EVMSpenderAuthoritySnapshot) {
+			o.Owner = strings.ToUpper(o.Owner)
+		}, false},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

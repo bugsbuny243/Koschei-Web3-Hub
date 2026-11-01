@@ -12,20 +12,20 @@ import (
 
 func TestCustomerApprovalResultRunsPB03OnObservedRPCResponse(t *testing.T) {
 	original := customerApprovalScanResult{
-		Network: "ethereum-mainnet",
-		Token: "0x1111111111111111111111111111111111111111",
-		Owner: "0x2222222222222222222222222222222222222222",
-		Spender: "0x3333333333333333333333333333333333333333",
-		Amount: "115792089237316195423570985008687907853269984665640564039457584007913129639935",
-		Unlimited: true,
+		Network:        "ethereum-mainnet",
+		Token:          "0x1111111111111111111111111111111111111111",
+		Owner:          "0x2222222222222222222222222222222222222222",
+		Spender:        "0x3333333333333333333333333333333333333333",
+		Amount:         "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+		Unlimited:      true,
 		EvidenceStatus: "observed", LiveAvailability: "checked",
 		SpenderAuthority: &services.EVMSpenderAuthoritySnapshot{
-			Network: "ethereum-mainnet",
-			Spender: "0x3333333333333333333333333333333333333333",
-			DelegationState: networktarget.EVMDelegationStateObserved,
+			Network:          "ethereum-mainnet",
+			Spender:          "0x3333333333333333333333333333333333333333",
+			DelegationState:  networktarget.EVMDelegationStateObserved,
 			DelegationTarget: "0x4444444444444444444444444444444444444444",
-			ProxyState: networktarget.EVMProxyAuthorityNotObserved,
-			Trust: services.Web3TrustVector{Observed: true},
+			ProxyState:       networktarget.EVMProxyAuthorityNotObserved,
+			Trust:            services.Web3TrustVector{Observed: true},
 		},
 	}
 	emit := func(result customerApprovalScanResult) services.SOCApprovalThreatAssessment {
@@ -37,7 +37,7 @@ func TestCustomerApprovalResultRunsPB03OnObservedRPCResponse(t *testing.T) {
 		}
 		var got struct {
 			SchemaVersion string `json:"schema_version"`
-			Result struct {
+			Result        struct {
 				ThreatAssessment services.SOCApprovalThreatAssessment `json:"threat_assessment"`
 			} `json:"result"`
 		}
