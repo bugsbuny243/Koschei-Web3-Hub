@@ -90,7 +90,7 @@ func TestActiveResponseLedgerRequiresValidChainAndTrustedTime(t *testing.T) {
 
 func TestActiveResponseLedgerDoesNotWriteWithoutStorage(t *testing.T) {
 	plan, review, recovery, now := activeResponseLedgerFixture(t)
-	result, err := RecordShadowLedger(context.Background(), nil, plan, review, recovery, now)
+	result, err := recordShadowLedger(context.Background(), nil, plan, review, recovery, now)
 	if err == nil || result.ExecutionPerformed {
 		t.Fatalf("nil DB must fail safely: %+v %v", result, err)
 	}
