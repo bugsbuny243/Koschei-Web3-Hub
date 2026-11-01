@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS security_solana_authority_watch_cursors (
     watch_address text PRIMARY KEY,
     watermark_signature text NOT NULL DEFAULT '',
     watermark_slot bigint NOT NULL DEFAULT 0,
+    initial_window_truncated boolean NOT NULL DEFAULT false,
     status text NOT NULL DEFAULT 'uninitialized',
     last_error text NOT NULL DEFAULT '',
     last_polled_at timestamptz,
