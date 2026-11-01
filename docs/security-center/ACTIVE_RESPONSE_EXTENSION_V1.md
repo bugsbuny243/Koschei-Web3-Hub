@@ -170,3 +170,58 @@ gofmt -l internal/defense/active_response*.go
 This is an additional offline admission check, not an operational SLA, a
 functional DDoS blackholing implementation, an on-chain pause authority, or
 a provider integration.
+
+## v1.2 recovery readiness and offline witness envelopes
+
+Two independent modules extend **review only**, without registering any
+network, router, HSM, smart-contract, identity, cloud or quarantine executor:
+
+- `active_response_recovery.go`: evaluates provider- and target-bound
+  recovery prerequisites. Network isolation/blackhole/scrubbing plans require
+  a bounded provider-enforced TTL and a rollback test attested within the
+  previous 30 days. Every action requires a trusted runbook, preserved
+  management-network access, verified break-glass procedure and a recovery
+  owner distinct from the listed observer.
+- `active_response_witness.go`: validates a short-lived Ed25519-signed
+  offline observation envelope against a trusted observer key registry, action
+  plan digest, tenant, target, provider, evidence SHA-256 digest, observer
+  identity and coverage metadata. Matching, conflicting and incomplete
+  witness reports are different statuses.
+
+The key distinction: **an offline witness statement does not prove that
+an action was executed**. In every witness assessment,
+`execution_performed=false` and `effect_agreement=not_exercised`
+regardless of whether the reported state matches the plan. These
+witnesses are not fed into `BuildDefensiveReceipt` because that would
+risk implying observed provider effects with no trusted execution record.
+
+The staging readiness statuses are `ready_for_staging_review` for
+reversible network controls and `manual_recovery_review` for actions whose
+automatic reversal cannot be assumed (including key revocation, contract
+pause, physical disconnect and HSM lock).
+
+**Trust boundary:** This code does not itself establish that provider
+inventory, rollback attestations, operator/observer IDs, coverage reports or
+signed observer claims reflect real infrastructure state. The caller must
+load all trusted inputs from an operator-managed registry, not a public
+request body. Signed assertions by distinct IDs are not proof of separate
+human identities; that remains a separate enrollment requirement.
+
+For future live operation, implement a durable signed execution-result
+ledger and independent external state confirmation before producing any
+receipt that claims `agree`. Keep unknown scope and incomplete evidence
+indeterminate, not successful. None of those live capabilities are
+introduced by this PR.
+
+### Validation additions
+
+```bash
+cd koschei/api
+go test ./internal/defense -run 'TestActiveResponse' -count=1
+gofmt -l internal/defense/active_response*.go
+```
+
+The new tests include recovery TTL, break-glass, tested rollback recency,
+separate recovery and observer IDs, cross-tenant bindings, signed witness
+tampering, freshness, coverage gaps, disagreement and prevention of false
+real-world effect claims.
