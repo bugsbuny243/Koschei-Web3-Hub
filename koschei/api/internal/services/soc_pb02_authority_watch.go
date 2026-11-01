@@ -31,6 +31,7 @@ type socPB02WatchEvent struct {
     AuthorityType string
     NewAuthority string
     Severity string
+    Recommendation string
 }
 
 type socPB02AuthorityWatch struct {
@@ -190,6 +191,7 @@ func inspectSOCpb02ParsedTransaction(watch string,info SolanaSignatureInfo,tx So
         if key==watch {watchIncluded=true}
     }
     if !watchIncluded {return nil,errors.New("watched account absent from transaction keys")}
+    if (info.Err!=nil)!=(errValue!=nil) {return nil,errors.New("signature and transaction status mismatch")}
     if errValue!=nil {return []socPB02WatchEvent{},nil}
     outer,ok:=message["instructions"].([]any)
     if !ok {return nil,errors.New("outer instruction evidence unavailable")}
@@ -216,18 +218,32 @@ func inspectSOCpb02ParsedTransaction(watch string,info SolanaSignatureInfo,tx So
         if target!=watch {return nil}
         authorityType:=anyString(infoMap["authorityType"])
         newAuthority:=anyString(infoMap["newAuthority"])
+        revoked:=false
         if kind=="initializePermanentDelegate" {
             if programID!=socPB02Token2022Program{return errors.New("permanent delegate on non-Token2022 program")}
             authorityType="permanentDelegate"
             newAuthority=anyString(infoMap["delegate"])
-        } else if authorityType=="" {return errors.New("SetAuthority type missing")}
+            if newAuthority=="" {return errors.New("permanent delegate identity missing")}
+        } else {
+            if authorityType=="" {return errors.New("SetAuthority type missing")}
+            raw,exists:=infoMap["newAuthority"]
+            if !exists {return errors.New("new authority presence not verified")}
+            revoked=raw==nil
+            if !revoked&&newAuthority=="" {return errors.New("empty new authority")}
+        }
         if newAuthority!=""&&!isLikelyRadarSolanaAddress(newAuthority){return errors.New("new authority malformed")}
         severity:="high"
-        switch strings.ToLower(authorityType) {
-        case "minttokens","freezeaccount","permanentdelegate","pausetransactions":severity="critical"
+        recommendation:="owner_review_authorization"
+        if revoked {
+            severity="informational"
+            recommendation="record_authority_revocation"
+        } else {
+            switch strings.ToLower(authorityType) {
+            case "minttokens","freezeaccount","permanentdelegate","pausetransactions":severity="critical"
+            }
         }
         events=append(events,socPB02WatchEvent{Watch:watch,Signature:info.Signature,Slot:info.Slot,Source:source,
-            Index:index,InnerSequence:seq,ProgramID:programID,Kind:kind,AuthorityType:authorityType,NewAuthority:newAuthority,Severity:severity})
+            Index:index,InnerSequence:seq,ProgramID:programID,Kind:kind,AuthorityType:authorityType,NewAuthority:newAuthority,Severity:severity,Recommendation:recommendation})
         return nil
     }
     for i,raw:=range outer {if err:=inspect(raw,"outer",i,0);err!=nil{return nil,err}}
@@ -248,9 +264,9 @@ func (w *socPB02AuthorityWatch) commitSignature(ctx context.Context,watch,previo
     defer dbtx.Rollback()
     for _,event:=range events {
         _,err=dbtx.ExecContext(ctx,`INSERT INTO security_soc_pb02_authority_observations
-            (network,watch_address,signature,slot,instruction_source,instruction_index,inner_sequence,program_id,event_kind,authority_type,new_authority,severity)
-            VALUES ('solana-mainnet',$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT DO NOTHING`,
-            watch,event.Signature,event.Slot,event.Source,event.Index,event.InnerSequence,event.ProgramID,event.Kind,event.AuthorityType,event.NewAuthority,event.Severity)
+            (network,watch_address,signature,slot,instruction_source,instruction_index,inner_sequence,program_id,event_kind,authority_type,new_authority,severity,recommended_action)
+            VALUES ('solana-mainnet',$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT DO NOTHING`,
+            watch,event.Signature,event.Slot,event.Source,event.Index,event.InnerSequence,event.ProgramID,event.Kind,event.AuthorityType,event.NewAuthority,event.Severity,event.Recommendation)
         if err!=nil{return err}
     }
     if bootstrap {
