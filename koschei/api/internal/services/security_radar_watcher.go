@@ -47,9 +47,13 @@ func StartSecurityRadarWatcher(ctx context.Context, db *sql.DB, _ *web3.SolanaRP
 	// before the broad-worker saver gate so journal ingest can retain
 	// deterministic replay coverage without re-enabling quota-heavy scanners.
 	stopGapHealer := StartSecurityRadarGapHealerIfEnabled(ctx, db)
+	// Independent, explicitly allowlisted PB-02 authority watch: at most four
+	// accounts; does not enable the high-volume raw WSS ledger.
+	stopPB02Watch := StartSOCpb02AuthorityWatchIfEnabled(ctx, db)
 	if SolanaRPCLimitSaverEnabled() && !ForceBackgroundRadarEnabled() {
 		log.Printf("broad security radar RPC workers paused: SOLANA_RPC_LIMIT_SAVER_ENABLED=true; budgeted slot gap healer remains independently gated; manual scans remain available")
 		return func() {
+			stopPB02Watch()
 			stopGapHealer()
 			stopDatabaseWorkers()
 		}
@@ -57,6 +61,7 @@ func StartSecurityRadarWatcher(ctx context.Context, db *sql.DB, _ *web3.SolanaRP
 	stopHeartbeat := StartArvisRadarHeartbeat(ctx, db)
 	stopStreamVerdicts := StartArvisStreamVerdictWorker(ctx, db)
 	stopAll := func() {
+		stopPB02Watch()
 		stopGapHealer()
 		stopStreamVerdicts()
 		stopHeartbeat()
