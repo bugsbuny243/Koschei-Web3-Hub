@@ -154,6 +154,8 @@ func recordShadowLedger(
 
 	// This lock serializes appends for one tenant on PostgreSQL; a hash collision
 	// only serializes extra tenants, and does not grant cross-tenant visibility.
+	// It also makes SELECT FOR UPDATE unnecessary on append-only audit rows:
+	// the staging writer needs only SELECT and INSERT grants.
 	if _, err = tx.ExecContext(ctx,
 		`SELECT pg_advisory_xact_lock(hashtextextended($1::text, 314159))`, plan.TenantID); err != nil {
 		return ActiveResponseLedgerResult{}, fmt.Errorf("lock shadow ledger tenant: %w", err)
@@ -162,7 +164,7 @@ func recordShadowLedger(
 	var savedTarget, savedProvider, savedDigest, savedChain string
 	err = tx.QueryRowContext(ctx, `SELECT target_id, provider_id, plan_digest, chain_hash
 		FROM koschei_active_response_shadow_plans
-		WHERE tenant_id = $1 AND action_id = $2 FOR UPDATE`,
+		WHERE tenant_id = $1 AND action_id = $2`,
 		plan.TenantID, plan.ActionID).Scan(&savedTarget, &savedProvider, &savedDigest, &savedChain)
 	if err == nil {
 		if savedTarget != plan.TargetID || savedProvider != review.ProviderID ||
