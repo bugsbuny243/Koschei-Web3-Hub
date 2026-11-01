@@ -517,3 +517,41 @@ Offline tests reject untrusted signer identities, missing DB access,
 missing genesis, future-dated checkpoints and canceled verification.
 Real production provider execution, database promotion/failover and
 external durable checkpoint archival remain out of scope.
+
+## v2.1 independent high-water anti-rollback fence
+
+`VerifyCurrentShadowLedgerCheckpointWithHighWatermark` adds an optional
+**independently retained**, previously authenticated per-tenant high-water
+mark to the v2.0 full-genesis signed checkpoint verification. This protects
+against restoring an old but correctly signed checkpoint, or replacing the
+audited database history with a divergent re-signed fork, **provided the
+external high-water mark and trust registry remain protected**.
+
+The trusted high-water input includes tenant, previously accepted cumulative
+record count, previously verified chain hash and issuance time. Fail-closed
+checks require:
+
+- exactly the same authenticated tenant;
+- nondecreasing record count and checkpoint issuance time;
+- the same chain head for checkpoints with an unchanged record count;
+- a *strictly later* issuance time if the record count increased;
+- the old trusted chain head at **exactly its old record position** inside
+  the newly read, fully verified ledger. This prefix check occurs inside
+  the same PostgreSQL `REPEATABLE READ READ ONLY` snapshot transaction
+  as the full genesis-to-tip verification.
+
+The new API does **not** create, store, update, sign or publish high-water
+marks. The caller must obtain them from a separately protected,
+authenticated, monotonic repository, and must not derive them from the
+same potentially compromised PostgreSQL database. This module cannot
+prevent rollback if both the primary database and its supposedly
+independent high-water archival authority are compromised, and does not
+guarantee a unique globally current view during distributed outages.
+
+Additional pure-Go tests cover tenant mismatches, missing/future trusted
+timestamps, invalid hashes, a shorter new ledger, same-height different
+head and forged issuance ordering. The isolated staging PostgreSQL
+acceptance verifies a genuinely signed two-record advancement, rejects a
+wrong previously trusted prefix, and rejects an old valid signature when
+the independently trusted high-water count is two. No live provider action
+or executor is enabled.
