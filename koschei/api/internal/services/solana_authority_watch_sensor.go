@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -408,6 +407,3 @@ func analyzeConfirmedSolanaAuthorityWatch(watch, signature string, slot int64, t
 	return found,nil
 }
 
-// Silence an accidental unused-import drift when the package is built with
-// a reduced test target.
-var _ = strconv.IntSize
