@@ -42,9 +42,16 @@ Migration 141 creates two small independent tables:
   digest, severity, `enforcement_state=not_connected` and
   `report_integrity=unsigned_rpc_observation`
 
-Evidence inserts and cursor advancement commit in the **same PostgreSQL
-transaction** after all matching signatures have been independently
-fetched and parsed. No transaction data is stored in the high-volume
+Evidence inserts, high/critical review alerts in the existing
+`security_alert_events` table, and cursor advancement commit in the
+**same PostgreSQL transaction** after all matching signatures have been
+independently fetched and parsed. Alert deduplication is scoped to the
+exact watched address, signature and instruction location; no alert can
+be permanently lost by checkpointing before a failed alert insert.
+The existing owner `GET /api/owner/incidents?suggestions=1` route can
+surface these recent alerts for manual review. There are **no**
+automatically created `security_incident_cases`, no customer wallet
+actions and no claim of compromise. No transaction data is stored in the high-volume
 raw WSS journal. Any malformed provider result, incomplete CPI coverage,
 or RPC failure blocks checkpoint progression.
 
@@ -67,7 +74,7 @@ silently labelled caught-up. A duplicate observation is not a new attack.
 - Required CI stages explicitly execute PostgreSQL acceptance to
   prevent a skipped DB test from looking green
 
-This implementation writes **review candidates**, not automatic
+This implementation writes **owner-visible alert review candidates**, not automatic
 `security_incident_cases`. It does not create signed unified verdict
 receipts or pause any token program, and there is no guaranteed event
 latency SLA. The next operational acceptance must link eligible
