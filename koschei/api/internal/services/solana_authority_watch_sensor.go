@@ -37,6 +37,7 @@ type solanaAuthorityWatchFinding struct {
 type solanaAuthorityWatchCursor struct {
 	Signature string
 	Slot      int64
+	InitialWindowTruncated bool
 }
 
 type solanaAuthorityWatchSensor struct {
@@ -146,9 +147,9 @@ func (w *solanaAuthorityWatchSensor) transaction(ctx context.Context, signature 
 
 func (w *solanaAuthorityWatchSensor) cursor(ctx context.Context, address string) (solanaAuthorityWatchCursor, error) {
 	var value solanaAuthorityWatchCursor
-	err := w.DB.QueryRowContext(ctx, `SELECT watermark_signature,watermark_slot
+	err := w.DB.QueryRowContext(ctx, `SELECT watermark_signature,watermark_slot,initial_window_truncated
 		FROM security_solana_authority_watch_cursors WHERE watch_address=$1`, address).
-		Scan(&value.Signature, &value.Slot)
+		Scan(&value.Signature, &value.Slot, &value.InitialWindowTruncated)
 	if errors.Is(err, sql.ErrNoRows) {
 		return value, nil
 	}
@@ -261,9 +262,9 @@ func (w *solanaAuthorityWatchSensor) processAddress(ctx context.Context, address
 		return err
 	}
 	var actual solanaAuthorityWatchCursor
-	if err = tx.QueryRowContext(ctx, `SELECT watermark_signature,watermark_slot
+	if err = tx.QueryRowContext(ctx, `SELECT watermark_signature,watermark_slot,initial_window_truncated
 		FROM security_solana_authority_watch_cursors WHERE watch_address=$1 FOR UPDATE`, address).
-		Scan(&actual.Signature, &actual.Slot); err != nil {
+		Scan(&actual.Signature, &actual.Slot, &actual.InitialWindowTruncated); err != nil {
 		return err
 	}
 	if actual != cursor {
@@ -323,14 +324,15 @@ func (w *solanaAuthorityWatchSensor) processAddress(ctx context.Context, address
 		}
 	}
 	status := "caught_up"
-	if cursor.Signature == "" && bootstrapTruncated {
+	if cursor.InitialWindowTruncated || (cursor.Signature == "" && bootstrapTruncated) {
 		status = "bootstrap_window_only"
 	}
 	head := collected[0]
 	_, err = tx.ExecContext(ctx, `UPDATE security_solana_authority_watch_cursors
-		SET watermark_signature=$2,watermark_slot=$3,status=$4,last_error='',
+		SET watermark_signature=$2,watermark_slot=$3,status=$4,
+		    initial_window_truncated=initial_window_truncated OR $5,last_error='',
 		    last_polled_at=now(),updated_at=now() WHERE watch_address=$1`,
-		address, head.Signature, head.Slot, status)
+		address, head.Signature, head.Slot, status, bootstrapTruncated)
 	if err != nil {
 		return err
 	}
