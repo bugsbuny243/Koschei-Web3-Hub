@@ -65,6 +65,10 @@ func AdaptEVMProbeEvidence(result networktarget.EVMProbeResult, observedAt time.
 		"analysis_performed":  true,
 		"live_availability":   "checked",
 	}
+	if result.RequestedBlock != "" {
+		attributes["requested_block"] = result.RequestedBlock
+		attributes["evidence_scope"] = "read_only_historical_network_probe"
+	}
 	if hash := strings.ToLower(strings.TrimSpace(result.ContractCodeHash)); hash != "" {
 		attributes["contract_code_sha256"] = hash
 	}

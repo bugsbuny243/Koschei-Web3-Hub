@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -24,6 +25,7 @@ const (
 var eip7702DelegationPrefix = []byte{0xef, 0x01, 0x00}
 
 type EVMProbeResult struct {
+	RequestedBlock             string     `json:"requested_block,omitempty"`
 	SchemaVersion              string     `json:"schema_version"`
 	Resolution                 Resolution `json:"resolution"`
 	ChainID                    string     `json:"chain_id"`
@@ -84,6 +86,28 @@ func ExpectedEVMChainID(networkID string) (string, bool) {
 // delegation indicator (0xef0100 || address) is reported as observed state only;
 // it does not prove who authorized the delegation or that the delegate is safe.
 func ProbeEVM(ctx context.Context, client *http.Client, endpoint string, resolution Resolution) (EVMProbeResult, error) {
+	return probeEVMAt(ctx, client, endpoint, resolution, "latest")
+}
+
+// ProbeEVMAtBlock observes end-of-block code at an explicit historical height.
+// It never falls back to latest on archive errors. This is an RPC observation,
+// not execution replay, a state proof, or evidence of pre-sign interception.
+func ProbeEVMAtBlock(ctx context.Context, client *http.Client, endpoint string, resolution Resolution, block string) (EVMProbeResult, error) {
+	if !strings.HasPrefix(block, "0x") || len(block) < 3 || (len(block) > 3 && block[2] == '0') {
+		return EVMProbeResult{}, fmt.Errorf("evm_historical_block_invalid")
+	}
+	if _, err := strconv.ParseUint(block[2:], 16, 64); err != nil || strings.ToLower(block) != block {
+		return EVMProbeResult{}, fmt.Errorf("evm_historical_block_invalid")
+	}
+	result, err := probeEVMAt(ctx, client, endpoint, resolution, block)
+	if err != nil {
+		return EVMProbeResult{}, err
+	}
+	result.RequestedBlock = block
+	return result, nil
+}
+
+func probeEVMAt(ctx context.Context, client *http.Client, endpoint string, resolution Resolution, block string) (EVMProbeResult, error) {
 	expectedChainID, ok := ExpectedEVMChainID(resolution.Network.ID)
 	if !ok || resolution.Network.Family != "evm" || !resolution.SyntaxValid {
 		return EVMProbeResult{}, fmt.Errorf("evm_probe_unsupported_target")
@@ -106,7 +130,7 @@ func ProbeEVM(ctx context.Context, client *http.Client, endpoint string, resolut
 		return EVMProbeResult{}, fmt.Errorf("evm_rpc_network_mismatch")
 	}
 
-	code, contractCodeResponseSHA256, err := evmRPCStringWithDigest(ctx, client, endpoint, 2, "eth_getCode", []any{strings.ToLower(resolution.Address), "latest"})
+	code, contractCodeResponseSHA256, err := evmRPCStringWithDigest(ctx, client, endpoint, 2, "eth_getCode", []any{strings.ToLower(resolution.Address), block})
 	if err != nil {
 		return EVMProbeResult{}, fmt.Errorf("evm_contract_code_unavailable: %w", err)
 	}
