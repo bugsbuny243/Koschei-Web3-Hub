@@ -3,10 +3,10 @@ package services
 import (
 	"context"
 	"database/sql"
+	"os"
 	"strings"
 	"testing"
 	"time"
-	"os"
 
 	_ "github.com/lib/pq"
 )
@@ -20,13 +20,13 @@ func signatureJournalTestWSS() SecurityRadarStreamEventRecord {
 		EventType: "raydium_pool_or_liquidity", Target: signature, TargetType: "pool_or_token",
 		Signature: signature, Slot: slot, ProgramID: defaultRaydiumProgramID,
 		EvidenceQuality: "decoded_stream_hint",
-		Decoded: map[string]any{"logs": []string{"Program log: Instruction: Swap"}},
+		Decoded:         map[string]any{"logs": []string{"Program log: Instruction: Swap"}},
 		RawEvent: map[string]any{
 			"method": "logsNotification",
 			"params": map[string]any{
 				"result": map[string]any{
 					"context": map[string]any{"slot": float64(slot)},
-					"value": map[string]any{"signature": signature, "err": nil},
+					"value":   map[string]any{"signature": signature, "err": nil},
 				},
 			},
 		},
@@ -41,8 +41,8 @@ func signatureJournalTestReplay() SecurityRadarStreamEventRecord {
 		EventType: "raydium_program_signature", Target: signature, TargetType: "signature",
 		Signature: signature, Slot: 100101, ProgramID: defaultRaydiumProgramID,
 		EvidenceQuality: "replay_signature_observed",
-		Decoded: map[string]any{"rpc_method": "getSignaturesForAddress", "requires_enrichment": true},
-		RawEvent: map[string]any{"signature": signature, "slot": int64(100101), "replayed": true},
+		Decoded:         map[string]any{"rpc_method": "getSignaturesForAddress", "requires_enrichment": true},
+		RawEvent:        map[string]any{"signature": signature, "slot": int64(100101), "replayed": true},
 	}
 }
 
@@ -53,7 +53,7 @@ func TestSignatureJournalAcceptsOnlyProvenancedObservedSignatures(t *testing.T) 
 		}
 	}
 	for _, test := range []struct {
-		name string
+		name   string
 		mutate func(*SecurityRadarStreamEventRecord)
 	}{
 		{"wrong_network", func(e *SecurityRadarStreamEventRecord) { e.Network = "solana-devnet" }},
@@ -81,7 +81,7 @@ func TestSignatureJournalAcceptsOnlyProvenancedObservedSignatures(t *testing.T) 
 		})
 	}
 	for _, test := range []struct {
-		name string
+		name   string
 		mutate func(*SecurityRadarStreamEventRecord)
 	}{
 		{"missing_replay_marker", func(e *SecurityRadarStreamEventRecord) { delete(e.RawEvent, "replayed") }},
@@ -118,12 +118,16 @@ func TestSignatureJournalRealPostgresAndReplayCursorInputs(t *testing.T) {
 		t.Skip("KOSCHEI_TEST_DATABASE_URL is unavailable")
 	}
 	db, err := sql.Open("postgres", dsn)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer db.Close()
 	db.SetMaxOpenConns(1)
 	ctx, cancel := context.WithTimeout(context.Background(), 35*time.Second)
 	defer cancel()
-	if err := db.PingContext(ctx); err != nil { t.Fatal(err) }
+	if err := db.PingContext(ctx); err != nil {
+		t.Fatal(err)
+	}
 
 	// Isolated per-connection temp table shadows production; test data never
 	// enters a public stream, and no existing row is modified or deleted.
@@ -133,17 +137,23 @@ func TestSignatureJournalRealPostgresAndReplayCursorInputs(t *testing.T) {
 	store := NewSecurityRadarStore(db)
 	wss := signatureJournalTestWSS()
 	wssID, err := store.InsertSignatureJournalEvent(ctx, wss)
-	if err != nil || wssID == "" { t.Fatalf("WSS journal row not durable: id=%q err=%v", wssID, err) }
+	if err != nil || wssID == "" {
+		t.Fatalf("WSS journal row not durable: id=%q err=%v", wssID, err)
+	}
 	repeated, err := store.InsertSignatureJournalEvent(ctx, wss)
-	if err != nil || repeated != "" { t.Fatalf("duplicate raw signature was counted twice: %q %v", repeated, err) }
+	if err != nil || repeated != "" {
+		t.Fatalf("duplicate raw signature was counted twice: %q %v", repeated, err)
+	}
 	replay := signatureJournalTestReplay()
 	replayID, err := store.InsertSignatureJournalEvent(ctx, replay)
-	if err != nil || replayID == "" { t.Fatalf("replay signature not durable: %q %v", replayID, err) }
+	if err != nil || replayID == "" {
+		t.Fatalf("replay signature not durable: %q %v", replayID, err)
+	}
 
 	var target sql.NullString
 	var targetType, quality, mode, digest string
 	if err := db.QueryRowContext(ctx, `SELECT target,target_type,evidence_quality,stream_mode,raw_event_sha256
-		FROM security_radar_stream_events WHERE id=$1::uuid`, wssID).Scan(&target,&targetType,&quality,&mode,&digest); err != nil {
+		FROM security_radar_stream_events WHERE id=$1::uuid`, wssID).Scan(&target, &targetType, &quality, &mode, &digest); err != nil {
 		t.Fatal(err)
 	}
 	if target.Valid || targetType != "signature" || quality != "decoded_stream_hint" ||
