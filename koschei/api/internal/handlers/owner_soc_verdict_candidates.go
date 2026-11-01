@@ -92,7 +92,7 @@ func (h *Handler) OwnerSOCVerdictCandidates(w http.ResponseWriter, r *http.Reque
 	w.Header().Set("Cache-Control", "no-store")
 	networkFilter, targetFilter, beforeAt, beforeID, err := ownerSOCVerdictPageFilter(r.URL.RawQuery)
 	if err != nil {
-		writeAPIError(w, http.StatusBadRequest, APICodeInvalidRequest, "Invalid SOC signed receipt history filter")
+		writeAPIError(w, http.StatusBadRequest, APICodeInvalidInput, "Invalid SOC signed receipt history filter")
 		return
 	}
 	if h == nil || h.DB == nil {
