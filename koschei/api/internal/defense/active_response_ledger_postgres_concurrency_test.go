@@ -19,6 +19,9 @@ func TestActiveResponsePostgresStagingLedgerConcurrency(t *testing.T) {
 	if dsn == "" {
 		t.Skip("dedicated staging PostgreSQL acceptance database not configured")
 	}
+	if err := validateIsolatedShadowPostgresDSN(dsn); err != nil {
+		t.Fatalf("refusing unsafe shadow staging database DSN: %v", err)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 	db, err := sql.Open("postgres", dsn)
