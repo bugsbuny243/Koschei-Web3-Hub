@@ -72,12 +72,12 @@ func AssessActiveResponseRecovery(
 	now time.Time,
 ) ActiveResponseRecoveryAssessment {
 	out := ActiveResponseRecoveryAssessment{
-		SchemaVersion:      ActiveResponseRecoverySchemaVersion,
-		Status:             ActiveResponseRecoveryBlocked,
-		ActionID:           plan.ActionID,
-		PlanDigest:         review.PlanDigest,
-		ProviderID:         capability.ProviderID,
-		Requirements:       []string{},
+		SchemaVersion: ActiveResponseRecoverySchemaVersion,
+		Status:        ActiveResponseRecoveryBlocked,
+		ActionID:      plan.ActionID,
+		PlanDigest:    review.PlanDigest,
+		ProviderID:    capability.ProviderID,
+		Requirements:  []string{},
 	}
 	if now.IsZero() {
 		out.Reason = "trusted evaluation time is required"
