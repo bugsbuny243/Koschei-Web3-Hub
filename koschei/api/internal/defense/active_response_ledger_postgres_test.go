@@ -1,6 +1,7 @@
 package defense
 
 import (
+	"bytes"
 	"context"
 	"crypto/ed25519"
 	"database/sql"
@@ -141,6 +142,53 @@ func TestActiveResponsePostgresStagingLedgerAcceptance(t *testing.T) {
 		"wrong-provider", first.PlanDigest)
 	if err == nil || conflict.Status != ActiveResponseReceiptUnknown {
 		t.Fatalf("conflicting shadow receipt accepted: %+v %v", conflict, err)
+	}
+
+	// An independently signed genesis-to-tip checkpoint must agree with the
+	// complete, repeatable-read PostgreSQL tenant snapshot.
+	priv := ed25519.NewKeyFromSeed(bytes.Repeat([]byte{79}, ed25519.SeedSize))
+	cp := ActiveResponseSignedCheckpoint{
+		SchemaVersion: ActiveResponseCheckpointSchemaVersion,
+		TenantID:      tenant,
+		StartHash:     entry.PreviousHash,
+		EndHash:       first.ChainHash,
+		RecordCount:   1,
+		SignerID:      "staging-audit-archive",
+		IssuedAt:      now,
+	}
+	payload, err := ActiveResponseCheckpointSigningPayload(cp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cp.Signature = ed25519.Sign(priv, payload)
+	keys := map[string]ed25519.PublicKey{
+		cp.SignerID: priv.Public().(ed25519.PublicKey),
+	}
+	verified, err := VerifyCurrentShadowLedgerCheckpoint(ctx, db, cp, keys, now.Add(time.Minute))
+	if err != nil || verified.Status != "verified" || verified.RecordsVerified != 1 ||
+		verified.ExecutionPerformed {
+		t.Fatalf("database checkpoint verification failed: %+v %v", verified, err)
+	}
+	badCheckpoint := cp
+	badCheckpoint.EndHash = cp.StartHash
+	if result, err := VerifyCurrentShadowLedgerCheckpoint(ctx, db, badCheckpoint, keys, now.Add(time.Minute)); err == nil ||
+		result.Status != "rejected" {
+		t.Fatalf("tampered signed checkpoint accepted: %+v %v", result, err)
+	}
+
+	// A signed historical one-row checkpoint must not pass as the CURRENT
+	// full tenant ledger after an additional separately reviewed append.
+	second := input
+	second.Request = input.Request
+	second.Request.ActionID = input.Request.ActionID + "-second"
+	resignShadowLedgerFixture(t, &second, now)
+	recordTwo, err := RecordVerifiedShadowLedger(ctx, db, second, now)
+	if err != nil || recordTwo.Status != ActiveResponseLedgerRecorded {
+		t.Fatalf("second shadow append failed: %+v %v", recordTwo, err)
+	}
+	if result, err := VerifyCurrentShadowLedgerCheckpoint(ctx, db, cp, keys, now.Add(time.Minute)); err == nil ||
+		result.Status != "rejected" {
+		t.Fatalf("stale signed ledger head accepted: %+v %v", result, err)
 	}
 }
 
