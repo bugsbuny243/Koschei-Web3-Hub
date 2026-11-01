@@ -211,12 +211,12 @@ func TestOwnerSOCImmutableCanonicalReceiptPostgres(t *testing.T) {
 	// keyset pages and independently verified from original signed bytes.
 	for i := 0; i < 22; i++ {
 		newFinal := services.FinalizeUnifiedRadarVerdictContractForNetwork(final.Target, final.Network, services.UnifiedRadarVerdict{
-			GeneratedAt:     time.Date(2026, 11, 1, 1, 0, i, 0, time.UTC),
+			GeneratedAt:    time.Date(2026, 11, 1, 1, 0, i, 0, time.UTC),
 			RulesetVersion: services.UnifiedRadarRulesetVersion,
 			ActorRuleset:   services.ActorDefenseRulesetVersion,
 			TriggeredRules: []services.ActorDefenseRuleHit{{
 				RuleID: services.ActorRuleCompoundCreatorReuse,
-				Tier: "compounding", EvidenceStatus: "verified",
+				Tier:   "compounding", EvidenceStatus: "verified",
 				Summary: fmt.Sprintf("verified creator evidence iteration %d", i),
 			}},
 		})
