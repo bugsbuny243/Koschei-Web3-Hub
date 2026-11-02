@@ -160,3 +160,28 @@ A dedicated CI gate rejects the CLI's no-digest mode; the PostgreSQL 17
 restore acceptance test checks absent, nonhex and mismatched object digests,
 then independently exercises the tampered-source-ID negative case using
 the tampered bytes' exact expected digest.
+
+## Export ledger provider-error redaction (2026-11-02)
+
+The `radar_retention_export_runs.error_message` field previously stored
+`runErr.Error()` directly. Object-storage responses and SDK errors can
+contain endpoint paths, request identifiers, signed query parameters, or
+credential-bearing details. Failed export runs now persist only fixed,
+non-sensitive reason codes:
+
+- `archive_export_failed`: a generic exporter failure.
+- `archive_export_checksum_mismatch`: at least one object readback
+  checksum mismatch; the separate `checksum_mismatches` counter remains
+  intact.
+
+Exported row/object/byte counts, status, last safe object reference and
+lock-acquired detail remain available for troubleshooting. An isolated
+PostgreSQL 17 regression test inserts synthetic failed/completed export
+runs, checks the persisted error-code boundary and removes only its own
+test records.
+
+**Important limitations:** This change only protects new records after
+the updated code is deployed. It does not inspect or rewrite existing
+production `error_message` contents. Do not copy historical raw provider
+errors into issue comments, CI reports, logs, or public dashboards; any
+historical cleanup requires separate authorized review.
