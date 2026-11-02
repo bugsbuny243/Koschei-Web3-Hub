@@ -185,3 +185,27 @@ the updated code is deployed. It does not inspect or rewrite existing
 production `error_message` contents. Do not copy historical raw provider
 errors into issue comments, CI reports, logs, or public dashboards; any
 historical cleanup requires separate authorized review.
+
+## Archive staging checksum parity before export (2026-11-02)
+
+Before choosing an external object key or sending staged rows to a sink,
+`SQLRepository.LoadPending` now recomputes each row's canonical
+`sha256(payload::jsonb::text)` within PostgreSQL and refuses the entire
+batch if it differs from the staged `row_checksum`. The exporter must not
+treat a correctly transmitted but internally corrupted archive object as
+valid cold-storage evidence.
+
+`SQLRepository.MarkExported` independently performs the same canonical
+payload checksum check within its atomic update, so a changed or invalid
+staging payload cannot be marked as externally verified by trusting the
+stored checksum column alone. The operation fails closed, preserving the
+staged row for explicit operator investigation rather than recording an
+export receipt for data with failed source-row integrity.
+
+The isolated PostgreSQL 17 test `TestArchiveStagingChecksumMustMatchPayloadPostgres17`
+creates a deliberately mismatched synthetic archive row (a correctly
+formatted 64-hex string with the wrong value), proves both load and
+export-marking reject it, and cleans up the synthetic source-independent
+run and staging records. This is **repository CI integrity evidence**;
+it is not proof that a real production S3 object has passed operator
+acceptance, nor does it enable automatic deletion of any source row.
