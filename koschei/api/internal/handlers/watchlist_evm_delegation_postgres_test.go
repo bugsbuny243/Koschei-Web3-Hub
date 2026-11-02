@@ -89,4 +89,19 @@ func TestWatchlistEVMDelegationRefreshPostgres17(t *testing.T) {
 	if _, alerts, err := h.refreshWatchlistTarget(ctx, subject, id); err != nil || alerts != 0 {
 		t.Fatalf("an unchanged delegation must not repeat: alerts=%d err=%v", alerts, err)
 	}
+
+	// An RPC outage marks the kept observation stale instead of refreshing it.
+	t.Setenv("ETHEREUM_RPC_URL", server.URL+"/unreachable-"+subject)
+	server.Close()
+	if _, _, err := h.refreshWatchlistTarget(ctx, subject, id); err == nil {
+		t.Fatal("a closed RPC must fail the probe")
+	}
+	var level, probeStatus, keptDelegate string
+	if err := db.QueryRowContext(ctx, `SELECT last_risk_level,last_snapshot->>'evm_probe_status',last_snapshot->'evm_delegation'->>'delegation_target' FROM watchlist_targets WHERE id=$1`, id).Scan(&level, &probeStatus, &keptDelegate); err != nil {
+		t.Fatal(err)
+	}
+	if level != "evm_probe_unavailable" || probeStatus != "unavailable" || keptDelegate != ciFixtureDelegate {
+		t.Fatalf("outage state = %s/%s keeping %s", level, probeStatus, keptDelegate)
+	}
+	code.Store("0xef0100" + strings.TrimPrefix(ciFixtureDelegate, "0x"))
 }

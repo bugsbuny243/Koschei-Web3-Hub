@@ -15,7 +15,7 @@ for(const [html,label] of [[reportsHTML,'reports html'],[watchHTML,'watchlist ht
   requireText(html,'/css/koschei.css?v=1',label);
 }
 requireText(reportsHTML,'/js/customer-reports-v2.js?v=3','reports html');
-requireText(watchHTML,'/js/customer-watchlist-v2.js?v=3','watchlist html');
+requireText(watchHTML,'/js/customer-watchlist-v2.js?v=4','watchlist html');
 requireText(reportsHTML,'History without invented evidence.','reports truth boundary');
 requireText(reportsHTML,'PROFESSIONAL · DURABLE CANONICAL JOB HISTORY','reports Professional boundary');
 requireText(reportsHTML,'History access requires an active Professional entitlement.','reports Professional authority boundary');

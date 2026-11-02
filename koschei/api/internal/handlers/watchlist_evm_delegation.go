@@ -62,8 +62,13 @@ func (h *Handler) refreshWatchlistEVMWallet(ctx context.Context, authSubject str
 		cancel()
 	}
 	if err != nil {
-		_, _ = h.DB.ExecContext(ctx, `UPDATE watchlist_targets SET last_checked_at=now(),next_check_at=now()+$3::interval,updated_at=now() WHERE id=$1 AND auth_subject=$2`,
-			target.ID, authSubject, interval.String())
+		// The previous observation is kept but marked stale, so it can never
+		// read as a fresh "no delegation" result during an RPC outage.
+		_, _ = h.DB.ExecContext(ctx, `
+			UPDATE watchlist_targets SET last_risk_level='evm_probe_unavailable',
+			       last_snapshot=last_snapshot||jsonb_build_object('evm_probe_status','unavailable','evm_probe_failed_at',to_char(now() AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"')),
+			       last_checked_at=now(),next_check_at=now()+$3::interval,updated_at=now()
+			WHERE id=$1 AND auth_subject=$2`, target.ID, authSubject, interval.String())
 		return target, 0, err
 	}
 	current := watchlistEVMDelegationSnapshot{

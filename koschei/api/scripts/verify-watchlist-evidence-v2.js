@@ -22,7 +22,7 @@ requireText(html,'id="watchThreshold" type="number" min="1" max="100" value="50"
 requireText(html,'id="watchTargetCount">—/—','unknown initial target count');
 requireText(html,'id="watchAlertCount">—/—','unknown initial alert count');
 requireText(html,'/js/koschei-auth.js?v=33','frozen auth client');
-requireText(html,'/js/customer-watchlist-v2.js?v=3','hardened watchlist controller');
+requireText(html,'/js/customer-watchlist-v2.js?v=4','hardened watchlist controller');
 forbid(html,/KOSCH tier|holder tier|Enterprise-entitlement/i,'removed package/token-backed watchlist access copy');
 forbid(html,/<script(?![^>]*\bsrc=)[^>]*>/i,'inline runtime script');
 forbid(html,/\son[a-z]+\s*=/i,'inline event handler');

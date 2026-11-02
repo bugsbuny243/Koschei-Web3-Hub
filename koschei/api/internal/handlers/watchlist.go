@@ -71,6 +71,10 @@ type watchlistTokenSnapshot struct {
 	CheckedAt            string   `json:"checked_at"`
 	// Set only for EVM wallets watched for EIP-7702 delegation.
 	EVMDelegation *watchlistEVMDelegationSnapshot `json:"evm_delegation,omitempty"`
+	// "unavailable" while the latest EVM probe failed; evm_delegation then
+	// holds the last successful observation, not the current state.
+	EVMProbeStatus   string `json:"evm_probe_status,omitempty"`
+	EVMProbeFailedAt string `json:"evm_probe_failed_at,omitempty"`
 }
 
 type watchlistAlertCandidate struct {
