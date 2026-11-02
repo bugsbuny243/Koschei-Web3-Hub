@@ -138,3 +138,25 @@ receipt negative tests and production operator approval before promotion.
 
 The production archive target is still absent. CI verifies the fail-closed
 guard but cannot establish real production archival or recovery.
+
+## Required independent object digest for restore acceptance (2026-11-02)
+
+The `-restore-acceptance` mode now **requires** `-sha256` as exactly
+64 hexadecimal characters. The `VerifyRestoreAcceptance` service function
+enforces the same requirement; no caller can obtain successful typed restore
+acceptance with an empty or malformed expected object digest. The CLI
+rejects a missing digest before opening a file or connecting to PostgreSQL.
+
+The expected SHA-256 must be obtained from an authenticated and independently
+reviewed **archive export receipt/object ledger** and correlated with the
+actual provider object key, sink, source-table identity, retention run and
+export run. Recomputing a hash of a downloaded file and passing it back as
+`-sha256` only proves self-consistency, **not** independent archive identity
+or immutability. Matching the supplied hash is necessary but **not sufficient**
+for production sign-off: require exact-object provider readback, source
+identity/count parity, typed restore and approved retention policy.
+
+A dedicated CI gate rejects the CLI's no-digest mode; the PostgreSQL 17
+restore acceptance test checks absent, nonhex and mismatched object digests,
+then independently exercises the tampered-source-ID negative case using
+the tampered bytes' exact expected digest.
