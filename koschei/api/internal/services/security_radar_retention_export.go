@@ -11,7 +11,11 @@ import (
 func (w *securityRadarRetentionWorker) exportPendingArchive(ctx context.Context, phase string) error {
 	result, err := retentionexport.RunFromEnv(ctx, w.db)
 	if !result.Enabled {
-		return nil
+		// A disabled/unconfigured export sink cannot authorize source deletion.
+		// PostgreSQL staging rows alone are not an independently retained
+		// archive; refuse both the current v2 and the legacy rollback worker.
+		// Do not include a provider URL or credentials in the error.
+		return fmt.Errorf("%s archive export preflight failed: durable destination disabled", phase)
 	}
 	if err != nil {
 		return fmt.Errorf("%s archive export failed: %w", phase, err)
