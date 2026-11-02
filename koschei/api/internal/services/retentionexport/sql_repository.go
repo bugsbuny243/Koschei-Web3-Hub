@@ -136,7 +136,13 @@ func (r *SQLRepository) FinishRun(ctx context.Context, runID string, result Resu
 	errorMessage := ""
 	if runErr != nil {
 		status = "failed"
-		errorMessage = runErr.Error()
+		// Provider/SDK errors may contain full endpoint URLs, request bodies,
+		// temporary tokens, or signed query strings. Persist only fixed codes;
+		// quantitative mismatch counters remain available for diagnostics.
+		errorMessage = "archive_export_failed"
+		if result.ChecksumMismatches > 0 {
+			errorMessage = "archive_export_checksum_mismatch"
+		}
 	}
 	detail, _ := json.Marshal(map[string]any{
 		"lock_acquired": result.LockAcquired,
