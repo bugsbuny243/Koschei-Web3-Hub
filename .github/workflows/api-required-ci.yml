@@ -184,6 +184,13 @@ jobs:
           go test -v ./internal/services/retentionexport -run '^(TestVerifyRestoreAcceptancePostgres17|TestArchiveExportRunFailureStoresOnlySafeErrorPostgres17)$' -count=1 2>&1 | tee /tmp/koschei-restore-acceptance.log
           grep -Fq -- '--- PASS: TestVerifyRestoreAcceptancePostgres17' /tmp/koschei-restore-acceptance.log
           grep -Fq -- '--- PASS: TestArchiveExportRunFailureStoresOnlySafeErrorPostgres17' /tmp/koschei-restore-acceptance.log
+      - name: Reject corrupt archive staging checksums before external export
+        env:
+          KOSCHEI_TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/koschei_ci?sslmode=disable
+        run: |
+          set -o pipefail
+          go test -v ./internal/services/retentionexport -run TestArchiveStagingChecksumMustMatchPayloadPostgres17 -count=1 2>&1 | tee /tmp/koschei-archive-staging-integrity.log
+          grep -Fq -- '--- PASS: TestArchiveStagingChecksumMustMatchPayloadPostgres17' /tmp/koschei-archive-staging-integrity.log
       - name: Reject unbound restore-acceptance CLI requests
         run: |
           if go run ./cmd/retention-verify -file /tmp/koschei-nonexistent-archive.ndjson -restore-acceptance > /tmp/koschei-restore-missing-sha.log 2>&1; then
