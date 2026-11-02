@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"koschei/api/internal/networktarget"
 	"koschei/api/internal/web3"
 )
 
@@ -68,6 +69,12 @@ type watchlistTokenSnapshot struct {
 	SourceProvider       string   `json:"source_provider"`
 	Findings             []string `json:"findings"`
 	CheckedAt            string   `json:"checked_at"`
+	// Set only for EVM wallets watched for EIP-7702 delegation.
+	EVMDelegation *watchlistEVMDelegationSnapshot `json:"evm_delegation,omitempty"`
+	// "unavailable" while the latest EVM probe failed; evm_delegation then
+	// holds the last successful observation, not the current state.
+	EVMProbeStatus   string `json:"evm_probe_status,omitempty"`
+	EVMProbeFailedAt string `json:"evm_probe_failed_at,omitempty"`
 }
 
 type watchlistAlertCandidate struct {
@@ -275,15 +282,34 @@ func (h *Handler) createWatchlistTarget(w http.ResponseWriter, r *http.Request) 
 	if req.TargetType == "" {
 		req.TargetType = "token"
 	}
-	if req.TargetType != "token" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "only_token_watchlists_are_enabled"})
-		return
-	}
 	if req.Network == "" {
 		req.Network = "solana-mainnet"
 	}
-	if req.Network != "solana-mainnet" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "unsupported_network"})
+	switch req.TargetType {
+	case "token":
+		if req.Network != "solana-mainnet" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "unsupported_network"})
+			return
+		}
+	case "wallet":
+		// EVM wallets are watched for EIP-7702 delegation only.
+		evm, configured := watchlistEVMWalletNetwork(req.Network)
+		if !evm {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "wallet_watch_requires_evm_network"})
+			return
+		}
+		if !configured {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "evm_rpc_not_configured", "network": req.Network})
+			return
+		}
+		resolution, err := networktarget.Resolve(req.Network, req.Target)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_evm_address"})
+			return
+		}
+		req.Target = strings.ToLower(resolution.Address)
+	default:
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "unsupported_watchlist_target_type"})
 		return
 	}
 	if req.AlertThreshold == 0 {
@@ -448,6 +474,11 @@ func (h *Handler) refreshWatchlistTarget(ctx context.Context, authSubject, id st
 	if err != nil {
 		return target, 0, err
 	}
+	if target.TargetType == "wallet" {
+		if evm, _ := watchlistEVMWalletNetwork(target.Network); evm {
+			return h.refreshWatchlistEVMWallet(ctx, authSubject, target, oldSnapshotRaw)
+		}
+	}
 	if target.TargetType != "token" {
 		return target, 0, fmt.Errorf("unsupported watchlist target type")
 	}
@@ -482,16 +513,8 @@ func (h *Handler) refreshWatchlistTarget(ctx context.Context, authSubject, id st
 	if err != nil {
 		return target, 0, err
 	}
-	for _, alert := range alerts {
-		previousRaw, _ := json.Marshal(alert.PreviousValue)
-		currentValueRaw, _ := json.Marshal(alert.CurrentValue)
-		evidenceRaw, _ := json.Marshal(alert.Evidence)
-		_, err = tx.ExecContext(ctx, `
-			INSERT INTO watchlist_alerts (watchlist_id,auth_subject,event_type,severity,title,message,previous_value,current_value,evidence)
-			VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9::jsonb)`, id, authSubject, alert.EventType, alert.Severity, alert.Title, alert.Message, string(previousRaw), string(currentValueRaw), string(evidenceRaw))
-		if err != nil {
-			return target, 0, err
-		}
+	if err := insertWatchlistAlerts(ctx, tx, id, authSubject, alerts); err != nil {
+		return target, 0, err
 	}
 	if err := tx.Commit(); err != nil {
 		return target, 0, err
@@ -724,4 +747,18 @@ func publicWatchlistError(err error) string {
 	default:
 		return "watchlist_refresh_failed"
 	}
+}
+
+func insertWatchlistAlerts(ctx context.Context, tx *sql.Tx, id, authSubject string, alerts []watchlistAlertCandidate) error {
+	for _, alert := range alerts {
+		previousRaw, _ := json.Marshal(alert.PreviousValue)
+		currentValueRaw, _ := json.Marshal(alert.CurrentValue)
+		evidenceRaw, _ := json.Marshal(alert.Evidence)
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO watchlist_alerts (watchlist_id,auth_subject,event_type,severity,title,message,previous_value,current_value,evidence)
+			VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9::jsonb)`, id, authSubject, alert.EventType, alert.Severity, alert.Title, alert.Message, string(previousRaw), string(currentValueRaw), string(evidenceRaw)); err != nil {
+			return err
+		}
+	}
+	return nil
 }

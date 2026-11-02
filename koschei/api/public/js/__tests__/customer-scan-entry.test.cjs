@@ -570,3 +570,20 @@ test('a wallet investigation is readable and leads with what the wallet has done
  assert.doesNotMatch(html,/Market snapshot|Investigation coverage/,'sections a wallet report does not carry are left out');
  assert.doesNotMatch(html,/complete collector evidence/,'no raw dump for a wallet report');
 });
+
+test('a found funding origin shows amount, source wallet, time and transaction',async()=>{
+ const f=ownerFixture(),report=readableFixture();
+ report.actor_investigation={...f.actor,funding_origin:{status:'initial_funding_observed',source_wallet:f.other,amount_sol:1.5,observed_at:'2026-09-15T16:00:00Z',signature:f.sig,verification_status:'verified'}};
+ const html=await renderCompleted(report);
+ assert.match(html,/First funding: <b>1.5 SOL<\/b> from/);
+ assert.match(html,new RegExp('https://solscan.io/account/'+f.other));
+ assert.match(html,/may be an exchange or service wallet/);
+});
+
+for(const status of ['signature_history_failed','investigation_failed','not_investigated','no_signatures'])test(`a ${status} funding collection renders as UNKNOWN, never as found`,async()=>{
+ const f=ownerFixture(),report=readableFixture();
+ report.actor_investigation={...f.actor,funding_origin:{status,limitations:['fixture limitation']}};
+ const html=await renderCompleted(report);
+ assert.match(html,/<b>UNKNOWN\.<\/b>/);
+ assert.doesNotMatch(html,/Oldest funding found|First funding:/);
+});
