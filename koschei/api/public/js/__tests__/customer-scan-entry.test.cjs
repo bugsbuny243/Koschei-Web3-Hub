@@ -579,3 +579,11 @@ test('a found funding origin shows amount, source wallet, time and transaction',
  assert.match(html,new RegExp('https://solscan.io/account/'+f.other));
  assert.match(html,/may be an exchange or service wallet/);
 });
+
+for(const status of ['signature_history_failed','investigation_failed','not_investigated','no_signatures'])test(`a ${status} funding collection renders as UNKNOWN, never as found`,async()=>{
+ const f=ownerFixture(),report=readableFixture();
+ report.actor_investigation={...f.actor,funding_origin:{status,limitations:['fixture limitation']}};
+ const html=await renderCompleted(report);
+ assert.match(html,/<b>UNKNOWN\.<\/b>/);
+ assert.doesNotMatch(html,/Oldest funding found|First funding:/);
+});

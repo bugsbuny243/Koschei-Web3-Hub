@@ -19,6 +19,11 @@ const actorFundingOldestFirstLimit = 25
 // bounded result unchanged.
 func FindActorFundingOriginOldestFirst(ctx context.Context, rpcURL, wallet string) (ActorFundingOrigin, bool) {
 	wallet = strings.TrimSpace(wallet)
+	// getTransactionsForAddress is the paid archival method; it is used only
+	// where the deployment opted in, like created-mint discovery.
+	if !heliusCreatedMintArchivalEnabled() {
+		return ActorFundingOrigin{}, false
+	}
 	apiKey := heliusEnhancedAPIKey(rpcURL)
 	if wallet == "" || apiKey == "" {
 		return ActorFundingOrigin{}, false
@@ -53,7 +58,7 @@ func actorFundingOriginFromOldestTransactions(wallet string, rows []map[string]a
 		info := SolanaSignatureInfo{Signature: signature, Slot: actorFundingInt64(tx["slot"])}
 		observedAt := actorFundingTransactionTime(info, tx)
 		signers := actorFundingSigners(message)
-		for _, instruction := range actorFundingInstructions(message, meta) {
+		for _, instruction := range actorFundingInstructionsInExecutionOrder(message, meta) {
 			candidate, ok := actorFundingInstructionCandidate(wallet, info, observedAt, signers, instruction)
 			if !ok {
 				continue
@@ -116,4 +121,31 @@ func fetchHeliusOldestTransactions(ctx context.Context, endpoint, wallet string)
 		return nil, fmt.Errorf("helius oldest history error %d: %s", response.Error.Code, strings.TrimSpace(response.Error.Message))
 	}
 	return response.Result.Data, nil
+}
+
+// actorFundingInstructionsInExecutionOrder places each top-level instruction's
+// inner (CPI) instructions right after it, the order they executed in, so the
+// first transfer found is the first one that happened.
+func actorFundingInstructionsInExecutionOrder(message, meta map[string]any) []map[string]any {
+	inner := map[int][]map[string]any{}
+	groups, _ := meta["innerInstructions"].([]any)
+	for _, raw := range groups {
+		group := actorFundingMap(raw)
+		index := int(actorFundingInt64(group["index"]))
+		items, _ := group["instructions"].([]any)
+		for _, item := range items {
+			if row := actorFundingMap(item); len(row) > 0 {
+				inner[index] = append(inner[index], row)
+			}
+		}
+	}
+	out := []map[string]any{}
+	top, _ := message["instructions"].([]any)
+	for index, item := range top {
+		if row := actorFundingMap(item); len(row) > 0 {
+			out = append(out, row)
+		}
+		out = append(out, inner[index]...)
+	}
+	return out
 }

@@ -30,6 +30,26 @@ func fundingFixtureTransfer(source, destination string, lamports int64) map[stri
 	}}
 }
 
+func TestOldestFirstFundingFollowsInstructionExecutionOrder(t *testing.T) {
+	wallet := "ci-fixture-creator"
+	tx := fundingFixtureTx("ci-fixture-sig-cpi", 100, 1790000000, false,
+		map[string]any{"program": "ci-fixture-router", "parsed": map[string]any{"type": "route"}},
+		fundingFixtureTransfer("ci-fixture-direct", wallet, 2e9))
+	// The CPI transfer runs inside top-level instruction 0, before instruction 1.
+	tx["meta"].(map[string]any)["innerInstructions"] = []any{map[string]any{"index": float64(0), "instructions": []any{fundingFixtureTransfer("ci-fixture-cpi", wallet, 1e9)}}}
+	origin, ok := actorFundingOriginFromOldestTransactions(wallet, []map[string]any{tx})
+	if !ok || origin.SourceWallet != "ci-fixture-cpi" {
+		t.Fatalf("the transfer that executed first must be the funding, got %+v", origin)
+	}
+}
+
+func TestOldestFirstFundingRequiresArchivalOptIn(t *testing.T) {
+	t.Setenv("HELIUS_CREATED_MINT_ARCHIVAL_ENABLED", "false")
+	if _, ok := FindActorFundingOriginOldestFirst(t.Context(), "https://mainnet.helius-rpc.com/?api-key=ci-fixture", "ci-fixture-creator"); ok {
+		t.Fatal("the paid archival method must not run without the explicit opt-in")
+	}
+}
+
 func TestOldestFirstFundingOriginIsTheFirstTransferIntoTheWallet(t *testing.T) {
 	wallet := "ci-fixture-creator"
 	rows := []map[string]any{
