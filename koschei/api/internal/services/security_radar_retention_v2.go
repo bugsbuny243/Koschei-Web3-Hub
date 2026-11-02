@@ -100,7 +100,11 @@ func (w *securityRadarRetentionWorkerV2) runOnce(ctx context.Context) {
 		// stops here. Never store the exporter error in the ledger: remote
 		// endpoints or credentials could be embedded in error messages.
 		w.base.recordHaltedRun(ctx, cutoff, "archive_export_preflight_failed")
-		log.Printf("radar retention v2: halted; %v", err)
+		// Avoid logging the raw provider error here: some storage SDK
+		// errors include endpoint URLs or credential-bearing request details.
+		// The fixed code is sufficient to correlate this halt with the
+		// operator's archive configuration and stays safe for log export.
+		log.Printf("radar retention v2: halted; archive_export_preflight_failed; no source rows deleted")
 		return
 	}
 	backlog, err := w.base.unexportedBacklog(ctx)
