@@ -67,3 +67,34 @@ Passing repository CI closes the implementation and PostgreSQL-17 restore-proof
 gate. Final GA still requires a production archive destination, a retained
 production object, a restore-acceptance run against that exact object's checksum,
 and deployment evidence tying the acceptance to the production revision.
+
+## Automatic retention secure destination gate (2026-11-02)
+
+The autonomous `StartSecurityRadarRetentionWorkerV2` and legacy rollback
+retention worker share `exportPendingArchive`. Both **halt before any
+archive/delete SQL** when `KOSCHEI_RADAR_ARCHIVE_EXPORT_SINK` is unset,
+`disabled`, or `filesystem`. The deletion path requires a configured S3
+destination with an **HTTPS** endpoint (not plain HTTP or URLs with embedded
+user credentials). The sink still must pass its actual provider connectivity
+and write/readback checks; an HTTPS-shaped URL alone does not authorize
+deletion.
+
+The standalone filesystem exporter and `retention-verify` remain available
+for isolated test fixtures and explicit restore verification; their existence
+does **not** authorize automated production retention against an ephemeral
+container directory. A durable mounted filesystem would require a separate
+reviewed architecture and acceptance gate rather than bypassing this policy.
+
+GitHub's PostgreSQL 17 acceptance checks verify:
+- Disabled/empty external export stops both workers' shared preflight.
+- Filesystem, HTTP and userinfo-bearing S3 endpoints are refused.
+- Failed preflight persists only the sanitized
+  `archive_export_preflight_failed` run status with zero
+  selected/archived/verified/deleted/pruned rows.
+- The normal archive export, checksum and restore tests still run separately.
+
+**Production operations remain blocked** until an approved durable S3 object
+destination is connected, the exact exported object has passed independent
+SHA-256 and row-parity readback, and an operator runs the typed PostgreSQL
+restore acceptance against that object. No configuration label, green CI
+status or empty archive backlog replaces this evidence.
