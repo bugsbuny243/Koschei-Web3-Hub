@@ -42,6 +42,12 @@ func RunSecurityRadarStreamRetention(ctx context.Context, db *sql.DB) (int64, er
 	if db == nil {
 		return 0, fmt.Errorf("stream retention requires a database")
 	}
+	// Operator parity flags alone do not prove any source row exists in an
+	// independent cold archive. Protect this separate decoded-hint deletion
+	// route with the same no-override external proof gate as v1/v2 retention.
+	if err := retentionRequireExternallyVerifiedSourceArchive(); err != nil {
+		return 0, fmt.Errorf("stream retention withheld: %w", err)
+	}
 	cutoff := time.Now().UTC().AddDate(0, 0, -policy.Days)
 	result, err := db.ExecContext(ctx, `
 		DELETE FROM security_radar_stream_events
