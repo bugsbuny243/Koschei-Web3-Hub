@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -81,15 +82,20 @@ func VerifyRestoreAcceptance(ctx context.Context, db *sql.DB, data []byte, expec
 	if db == nil {
 		return result, fmt.Errorf("retention restore verification database is required")
 	}
+	// An independently supplied expected object checksum is mandatory.
+	// Internal row checksums alone cannot establish that these bytes belong
+	// to the approved archived object; never report restore acceptance without
+	// the external object identity proof.
 	expectedObjectSHA256 = strings.ToLower(strings.TrimSpace(expectedObjectSHA256))
+	if len(expectedObjectSHA256) != 64 {
+		return result, fmt.Errorf("expected retention object sha256 is required (64 hexadecimal characters)")
+	}
+	if _, err := hex.DecodeString(expectedObjectSHA256); err != nil {
+		return result, fmt.Errorf("expected retention object sha256 must be hexadecimal")
+	}
 	result.ObjectSHA256 = sha256Hex(data)
-	if expectedObjectSHA256 != "" {
-		if len(expectedObjectSHA256) != 64 {
-			return result, fmt.Errorf("expected retention object checksum must be sha256")
-		}
-		if result.ObjectSHA256 != expectedObjectSHA256 {
-			return result, fmt.Errorf("retention object checksum mismatch: expected=%s actual=%s", expectedObjectSHA256, result.ObjectSHA256)
-		}
+	if result.ObjectSHA256 != expectedObjectSHA256 {
+		return result, fmt.Errorf("retention object checksum mismatch: expected=%s actual=%s", expectedObjectSHA256, result.ObjectSHA256)
 	}
 
 	verified, err := VerifyExportObject(ctx, db, data)
