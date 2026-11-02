@@ -124,6 +124,22 @@ jobs:
           path: ${{ runner.temp }}/retention-archive-postgres17.txt
           if-no-files-found: warn
           retention-days: 7
+      - name: Verify disabled archive cannot authorize deletion (PostgreSQL 17)
+        env:
+          KOSCHEI_TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/koschei_ci?sslmode=disable
+        run: |
+          set -o pipefail
+          go test -v ./internal/services -run '^(TestRetentionExternalArchiveDisabledFailsClosed|TestRetentionV2DisabledArchiveSinkRecordsHaltPostgres17)$' -count=1 2>&1 | tee "${RUNNER_TEMP}/retention-disabled-sink-postgres17.txt"
+          grep -q -- '--- PASS: TestRetentionExternalArchiveDisabledFailsClosed' "${RUNNER_TEMP}/retention-disabled-sink-postgres17.txt"
+          grep -q -- '--- PASS: TestRetentionV2DisabledArchiveSinkRecordsHaltPostgres17' "${RUNNER_TEMP}/retention-disabled-sink-postgres17.txt"
+      - name: Upload disabled-sink PostgreSQL log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: retention-disabled-sink-postgres17
+          path: ${{ runner.temp }}/retention-disabled-sink-postgres17.txt
+          if-no-files-found: warn
+          retention-days: 7
       - name: Verify archive preflight failure is durably halted (PostgreSQL 17)
         env:
           KOSCHEI_TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/koschei_ci?sslmode=disable
