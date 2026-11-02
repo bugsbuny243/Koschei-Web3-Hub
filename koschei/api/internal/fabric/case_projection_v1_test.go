@@ -82,3 +82,37 @@ func TestBuildWeb3ProjectionV1RejectsUnsupportedEffectState(t *testing.T) {
 		t.Fatal("expected unsupported effect state to fail")
 	}
 }
+
+func TestBuildWeb3ProjectionV1EnforcesEnvelopeLengthBounds(t *testing.T) {
+	long := func(n int) *string { value := strings.Repeat("x", n); return &value }
+	cases := map[string]func(*Web3ProjectionInputV1){
+		"case ID":             func(in *Web3ProjectionInputV1) { in.CaseID = *long(161) },
+		"trace ID":            func(in *Web3ProjectionInputV1) { in.TraceID = long(161) },
+		"network":             func(in *Web3ProjectionInputV1) { in.Network = *long(161) },
+		"target":              func(in *Web3ProjectionInputV1) { in.Target = *long(513) },
+		"requested operation": func(in *Web3ProjectionInputV1) { in.RequestedOperation = *long(257) },
+		"nonce":               func(in *Web3ProjectionInputV1) { in.Nonce = long(257) },
+		"requested effect":    func(in *Web3ProjectionInputV1) { in.RequestedEffect = *long(1001) },
+		"receipt ref":         func(in *Web3ProjectionInputV1) { in.ReceiptRef = long(1025) },
+		"native schema":       func(in *Web3ProjectionInputV1) { in.NativeSchema = *long(257) },
+		"native ref":          func(in *Web3ProjectionInputV1) { in.NativeRef = *long(1025) },
+	}
+	for name, mutate := range cases {
+		input := baseProjectionInput()
+		mutate(&input)
+		_, err := BuildWeb3ProjectionV1(input)
+		if err == nil || !strings.Contains(err.Error(), name) {
+			t.Fatalf("%s over the envelope bound: error = %v", name, err)
+		}
+	}
+}
+
+func TestBuildWeb3ProjectionV1AcceptsEnvelopeBoundsInCharacters(t *testing.T) {
+	input := baseProjectionInput()
+	// 512 multi-byte characters is within the schema's 512-character target bound.
+	input.Target = strings.Repeat("ş", 512)
+	input.RequestedEffect = strings.Repeat("x", 1000)
+	if _, err := BuildWeb3ProjectionV1(input); err != nil {
+		t.Fatalf("values at the envelope bounds were rejected: %v", err)
+	}
+}

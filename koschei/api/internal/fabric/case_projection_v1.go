@@ -3,8 +3,10 @@ package fabric
 import (
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 const (
@@ -114,6 +116,9 @@ func BuildWeb3ProjectionV1(input Web3ProjectionInputV1) (Web3ProjectionV1, error
 	if strings.TrimSpace(input.NativeSchema) == "" || strings.TrimSpace(input.NativeRef) == "" {
 		return Web3ProjectionV1{}, errors.New("native schema and ref are required")
 	}
+	if err := checkEnvelopeLengths(input); err != nil {
+		return Web3ProjectionV1{}, err
+	}
 	if !validSHA256(input.NativeDigestSHA256) {
 		return Web3ProjectionV1{}, errors.New("native digest must be lowercase SHA-256 hex")
 	}
@@ -159,6 +164,40 @@ func BuildWeb3ProjectionV1(input Web3ProjectionInputV1) (Web3ProjectionV1, error
 			MappingState:       input.MappingState,
 		},
 	}, nil
+}
+
+// checkEnvelopeLengths mirrors the maxLength bounds of
+// fabric/contracts/security-case-envelope.v1.schema.json so a projection built
+// here is never rejected by the envelope schema. JSON Schema counts characters,
+// not bytes.
+func checkEnvelopeLengths(input Web3ProjectionInputV1) error {
+	optional := func(value *string) string {
+		if value == nil {
+			return ""
+		}
+		return *value
+	}
+	for _, field := range []struct {
+		name  string
+		value string
+		max   int
+	}{
+		{"case ID", input.CaseID, 160},
+		{"trace ID", optional(input.TraceID), 160},
+		{"network", input.Network, 160},
+		{"target", input.Target, 512},
+		{"requested operation", input.RequestedOperation, 256},
+		{"nonce", optional(input.Nonce), 256},
+		{"requested effect", input.RequestedEffect, 1000},
+		{"receipt ref", optional(input.ReceiptRef), 1024},
+		{"native schema", input.NativeSchema, 256},
+		{"native ref", input.NativeRef, 1024},
+	} {
+		if utf8.RuneCountInString(field.value) > field.max {
+			return fmt.Errorf("%s must be at most %d characters", field.name, field.max)
+		}
+	}
+	return nil
 }
 
 func validSHA256(value string) bool {
