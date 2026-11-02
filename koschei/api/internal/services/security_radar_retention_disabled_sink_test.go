@@ -84,3 +84,38 @@ func TestRetentionV2DisabledArchiveSinkRecordsHaltPostgres17(t *testing.T) {
 			selected, archived, verified, deleted, pruned)
 	}
 }
+
+// The automatic retention worker cannot treat ephemeral disk or unauthenticated
+// plain HTTP as an independently retained archive. The exporter utility keeps
+// filesystem support for isolated restore fixtures; no provider call occurs.
+func TestRetentionDurableExportPreflightRequiresSecureS3(t *testing.T) {
+	for _, tc := range []struct {
+		name, mode, endpoint, wantError string
+	}{
+		{"filesystem", "filesystem", "", "requires S3 archive destination"},
+		{"plain HTTP", "s3", "http://archive.example.test", "secure HTTPS S3 endpoint"},
+		{"inline URL credentials", "s3", "https://testuser:secret@archive.example.test", "secure HTTPS S3 endpoint"},
+		{"invalid endpoint", "s3", "not-an-endpoint", "secure HTTPS S3 endpoint"},
+		{"empty endpoint", "s3", "", "secure HTTPS S3 endpoint"},
+		{"secure HTTPS", "s3", "https://archive.example.test", ""},
+		{"uppercase S3 mode", "S3", "https://archive.example.test", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("KOSCHEI_RADAR_ARCHIVE_EXPORT_SINK", tc.mode)
+			t.Setenv("KOSCHEI_RADAR_ARCHIVE_EXPORT_S3_ENDPOINT", tc.endpoint)
+			err := retentionDurableExportPreflight()
+			if tc.wantError == "" {
+				if err != nil {
+					t.Fatalf("secure archive config shape unexpectedly rejected: %v", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tc.wantError) {
+				t.Fatalf("archive preflight error=%v, want %q", err, tc.wantError)
+			}
+			if err != nil && strings.Contains(err.Error(), "testuser:secret") {
+				t.Fatal("preflight error exposed inline endpoint credentials")
+			}
+		})
+	}
+}
