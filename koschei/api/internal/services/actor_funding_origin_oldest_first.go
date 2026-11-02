@@ -131,7 +131,12 @@ func actorFundingInstructionsInExecutionOrder(message, meta map[string]any) []ma
 	groups, _ := meta["innerInstructions"].([]any)
 	for _, raw := range groups {
 		group := actorFundingMap(raw)
-		index := int(actorFundingInt64(group["index"]))
+		raw := actorFundingInt64(group["index"])
+		// Instruction indexes are small; anything else is malformed and skipped.
+		if raw < 0 || raw > 1<<16 {
+			continue
+		}
+		index := int(raw)
 		items, _ := group["instructions"].([]any)
 		for _, item := range items {
 			if row := actorFundingMap(item); len(row) > 0 {
