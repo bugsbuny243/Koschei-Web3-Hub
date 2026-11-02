@@ -1,7 +1,10 @@
 package handlers
 
 import (
+	"fmt"
+	"strings"
 	"testing"
+	"time"
 
 	"koschei/api/internal/networktarget"
 )
@@ -73,5 +76,24 @@ func TestWatchlistWalletsRequireARegisteredEVMNetwork(t *testing.T) {
 	t.Setenv("ETHEREUM_RPC_URL", "https://ci-fixture.invalid")
 	if _, configured := watchlistEVMWalletNetwork("ethereum-mainnet"); !configured {
 		t.Fatal("a configured RPC must enable wallet watch")
+	}
+}
+
+func TestWatchlistEVMProbeErrorsNeverCarryTheRPCURL(t *testing.T) {
+	raw := fmt.Errorf(`evm_chain_id_unavailable: Post "https://rpc.example/v2/ci-fixture-secret-key": dial tcp: connection refused`)
+	if got := watchlistEVMProbeError(raw).Error(); got != "evm_chain_id_unavailable" || strings.Contains(got, "secret") {
+		t.Fatalf("sanitized error = %q", got)
+	}
+	if got := watchlistEVMProbeError(fmt.Errorf(`Post "https://rpc.example/?key=ci-fixture-secret": timeout`)).Error(); got != "evm_probe_failed" {
+		t.Fatalf("an error without a category must not leak its text: %q", got)
+	}
+}
+
+func TestWatchlistEVMNextCheckFitsTheMonitorTick(t *testing.T) {
+	if got := watchlistEVMNextCheck(time.Minute); got != 45*time.Second {
+		t.Fatalf("one-minute cadence schedules %s, want 45s so the next tick picks it up", got)
+	}
+	if got := watchlistEVMNextCheck(20 * time.Second); got != 15*time.Second {
+		t.Fatalf("short cadence = %s", got)
 	}
 }

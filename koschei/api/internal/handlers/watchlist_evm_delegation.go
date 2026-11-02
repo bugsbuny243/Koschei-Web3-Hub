@@ -48,8 +48,29 @@ func watchlistEVMCheckInterval() time.Duration {
 	return time.Minute
 }
 
+// watchlistEVMNextCheck leaves a margin before the interval so a check that
+// finishes a second after a monitor tick is due again at the next tick, not
+// the one after.
+func watchlistEVMNextCheck(interval time.Duration) time.Duration {
+	margin := interval / 4
+	if margin > 15*time.Second {
+		margin = 15 * time.Second
+	}
+	return interval - margin
+}
+
+// watchlistEVMProbeError keeps only the probe's error category. Transport
+// errors embed the request URL, and an RPC URL can carry a provider API key.
+func watchlistEVMProbeError(err error) error {
+	category := strings.TrimSpace(strings.SplitN(err.Error(), ":", 2)[0])
+	if category == "" || strings.ContainsAny(category, "/?=@ ") {
+		category = "evm_probe_failed"
+	}
+	return fmt.Errorf("%s", category)
+}
+
 func (h *Handler) refreshWatchlistEVMWallet(ctx context.Context, authSubject string, target watchlistTarget, oldSnapshotRaw []byte) (watchlistTarget, int, error) {
-	interval := watchlistEVMCheckInterval()
+	interval := watchlistEVMNextCheck(watchlistEVMCheckInterval())
 	endpoint := canonicalNativeRPCEnv(target.Network)
 	resolution, err := networktarget.Resolve(target.Network, target.Target)
 	if err == nil && endpoint == "" {
@@ -60,6 +81,9 @@ func (h *Handler) refreshWatchlistEVMWallet(ctx context.Context, authSubject str
 		probeCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 		probe, err = networktarget.ProbeEVM(probeCtx, watchlistEVMHTTPClient, endpoint, resolution)
 		cancel()
+		if err != nil {
+			err = watchlistEVMProbeError(err)
+		}
 	}
 	if err != nil {
 		// The previous observation is kept but marked stale, so it can never
