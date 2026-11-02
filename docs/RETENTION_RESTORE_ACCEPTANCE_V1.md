@@ -116,9 +116,14 @@ tested, per-row external receipt-before-delete protocol is implemented.
 There is deliberately no configuration flag that overrides this guard.
 The guard applies even if S3 is reachable; previously staged archive
 backlog can still be exported and verified without removing original rows.
-The v1/v2 direct worker methods also enforce this guard. The low-level
-SQL builders remain available only for isolated archive/checksum tests
-and cannot authorize autonomous production deletion by themselves.
+The v1/v2 direct worker methods also enforce this guard. The separate
+`RunSecurityRadarStreamRetention` decoded-hint deletion path requires the
+same external row proof **even when both** `KOSCHEI_STREAM_RETENTION_ENABLED`
+and `KOSCHEI_STREAM_RETENTION_PARITY_APPROVED` are explicitly true; parity
+approval flags alone cannot supply an immutable off-database receipt.
+The low-level SQL builders remain available only for isolated
+archive/checksum tests and cannot authorize autonomous production deletion
+by themselves.
 
 To restore the automatic deletion capability, implement a reviewed two-phase
 pipeline that (1) stages exact immutable source snapshots, (2) exports them
