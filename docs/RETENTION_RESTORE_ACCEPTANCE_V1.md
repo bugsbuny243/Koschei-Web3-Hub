@@ -98,3 +98,38 @@ destination is connected, the exact exported object has passed independent
 SHA-256 and row-parity readback, and an operator runs the typed PostgreSQL
 restore acceptance against that object. No configuration label, green CI
 status or empty archive backlog replaces this evidence.
+
+## Unconnected external proof-before-source-delete pipeline (2026-11-02)
+
+**Critical distinction:** `retentionArchiveQueryV2` and the legacy
+`retentionArchiveQuery` atomically stage source rows to
+`radar_retention_archive` and delete the original source rows in PostgreSQL.
+The separate `after_retention` / `after_retention_v2` object export runs
+*after* that SQL. Therefore HTTPS/S3 sink connectivity **does not prove**
+that the exact source rows were durably exported before their deletion.
+A failed later export would leave those rows only in the same PostgreSQL
+archive tier, not in an independently verified cold archive.
+
+Both automatic retention workers now **refuse original source-row deletion**
+through `retentionRequireExternallyVerifiedSourceArchive` until a reviewed,
+tested, per-row external receipt-before-delete protocol is implemented.
+There is deliberately no configuration flag that overrides this guard.
+The guard applies even if S3 is reachable; previously staged archive
+backlog can still be exported and verified without removing original rows.
+The v1/v2 direct worker methods also enforce this guard. The low-level
+SQL builders remain available only for isolated archive/checksum tests
+and cannot authorize autonomous production deletion by themselves.
+
+To restore the automatic deletion capability, implement a reviewed two-phase
+pipeline that (1) stages exact immutable source snapshots, (2) exports them
+to an approved durable external object store, (3) independently verifies
+object SHA-256, source identities and row counts, (4) binds a durable
+per-row export receipt to the original source revision, and (5) deletes
+only those still-matching originals with bounded locks, retry/idempotency
+and a tested rollback path. A successful HTTP connection probe, sink
+configuration, database-only checksum or generic boolean flag is never
+sufficient. Include PostgreSQL 17 crash/retry, mutation and mismatched
+receipt negative tests and production operator approval before promotion.
+
+The production archive target is still absent. CI verifies the fail-closed
+guard but cannot establish real production archival or recovery.
