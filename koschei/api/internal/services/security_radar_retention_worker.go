@@ -249,6 +249,15 @@ func retentionNextBatchSize(current int) int {
 }
 
 func (w *securityRadarRetentionWorker) archiveAndDelete(ctx context.Context, runID string, target retentionTarget, cutoff time.Time, stats *runStats) int64 {
+	// Never delete an original row merely because PostgreSQL staging succeeded.
+	// Exact external object receipt/parity has not yet been wired to the
+	// deletion transaction. This guard also protects direct worker calls.
+	if err := retentionRequireExternallyVerifiedSourceArchive(); err != nil {
+		if stats != nil {
+			stats.HaltReason = err.Error()
+		}
+		return 0
+	}
 	query := retentionArchiveQuery(target)
 	var total int64
 	batchLimit := retentionInitialBatchSize(target)
