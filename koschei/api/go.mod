@@ -4,7 +4,7 @@ go 1.26.10
 
 require (
 	github.com/lib/pq v1.12.3
-	github.com/nats-io/nats.go v1.54.0
+	github.com/nats-io/nats.go v1.55.0
 	github.com/xssnick/tonutils-go v1.19.1
 	golang.org/x/crypto v0.58.0
 )
