@@ -124,6 +124,8 @@ jobs:
           path: ${{ runner.temp }}/retention-archive-postgres17.txt
           if-no-files-found: warn
           retention-days: 7
+      - name: Assert no source deletion without per-row external archive receipt
+        run: go test -v ./internal/services -run '^TestRetentionSourceDeletionRequiresExternalRowProof$' -count=1
       - name: Verify disabled archive cannot authorize deletion (PostgreSQL 17)
         env:
           KOSCHEI_TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/koschei_ci?sslmode=disable
