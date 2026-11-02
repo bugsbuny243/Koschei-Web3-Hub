@@ -10,6 +10,19 @@ import (
 	"koschei/api/internal/services/retentionexport"
 )
 
+// retentionRequireExternallyVerifiedSourceArchive protects both retention
+// workers, including direct archiveAndDelete calls. At present the archive
+// SQL stages a row and deletes its source in the same statement, while the
+// independent object export only runs afterward. A successful S3 connection
+// preflight proves no individual source row was externally retained.
+//
+// Intentionally NO environment flag or boolean enables this operation.
+// Replacing this guard requires a reviewed two-phase implementation that
+// authenticates a durable per-row external archive receipt BEFORE deletion.
+func retentionRequireExternallyVerifiedSourceArchive() error {
+	return fmt.Errorf("external_archive_proof_before_source_delete_not_wired")
+}
+
 // Autonomous source deletion requires an independently retained, encrypted
 // object destination. A filesystem sink may write to ephemeral container
 // storage, and a plain HTTP S3 endpoint may expose credentials or evidence.
