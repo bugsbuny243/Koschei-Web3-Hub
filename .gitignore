@@ -9,3 +9,4 @@
 # Hidden Owner Panel must not be shipped from public static assets
 koschei/api/public/owner.html
 owner.html
+koschei/api/diagnostics/
