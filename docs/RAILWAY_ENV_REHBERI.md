@@ -132,7 +132,7 @@ Ayrı worker / sentinel servisleri için `docs/defense-*.env.example` dosyaları
 | Sui | `SUI_GRAPHQL_URL` | — (ayrı route) | — |
 | Aptos | `APTOS_REST_URL` | — (ayrı route) | — |
 | Tron | `TRONGRID_API_KEY` 🔐 (wallet permission collector) | `tron-mainnet`: `primary`+`secondary` (`/wallet`, `/walletsolidity`) + `indexed` (TronGrid V1), header `TRON-PRO-API-KEY` | — |
-| TON | — | `ton-mainnet`: toncenter uyumlu `/api/v2` **ve** `/api/v3`, header `X-API-Key` (TonAPI uyumlu değil) | — |
+| TON | — | `ton-mainnet`: toncenter uyumlu `/api/v2` **ve** `/api/v3`, header `X-API-Key` (TonAPI uyumlu değil). JSON'da `ton-mainnet` yoksa `TONCENTER_API_KEY` 🔐 tek başına yeterli: primary otomatik olarak `https://toncenter.com` olur. | — |
 | Linea, Scroll, zkSync, Berachain, HyperEVM, Monad, Sei EVM | — | `linea-mainnet`, `scroll-mainnet`, `zksync-mainnet`, `berachain-mainnet`, `hyperevm-mainnet`, `monad-mainnet`, `sei-evm-mainnet` (EIP-1898 destekli JSON-RPC) | — |
 | Cosmos Hub, Osmosis, Celestia, Injective, Sei | — | `cosmoshub-mainnet`, `osmosis-mainnet`, `celestia-mainnet`, `injective-mainnet`, `sei-mainnet` (LCD REST) | — |
 | Stellar | — | `stellar-mainnet` (Stellar JSON-RPC) | — |

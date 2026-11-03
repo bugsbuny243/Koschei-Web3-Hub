@@ -63,3 +63,75 @@ func TestRadarExecutionWithoutProvidersNeverCompletesOrGrades(t *testing.T) {
 		t.Fatalf("false completion %#v", out)
 	}
 }
+
+func TestToncenterKeyFallbackConfiguresTonPrimaryOnlyInHeader(t *testing.T) {
+	const key = "fixture-toncenter-key-not-real"
+	t.Setenv("RADAR_PROVIDERS_JSON", "")
+	t.Setenv("TONCENTER_API_KEY", " "+key+" ")
+	cfg := RadarProviderConfig()
+	ton, ok := cfg["ton-mainnet"]
+	if !ok {
+		t.Fatal("TONCENTER_API_KEY must configure ton-mainnet when no explicit entry exists")
+	}
+	if ton.Primary.URL != toncenterMainnetURL || ton.Primary.Headers["X-API-Key"] != key {
+		t.Fatalf("unexpected fallback provider: url=%q header_set=%v", ton.Primary.URL, ton.Primary.Headers["X-API-Key"] == key)
+	}
+	if strings.Contains(ton.Primary.URL, key) {
+		t.Fatal("toncenter key must not be placed in the provider URL")
+	}
+	if ton.Secondary.URL != "" || len(cfg) != 1 {
+		t.Fatalf("fallback must add only the ton-mainnet primary role, got %d networks", len(cfg))
+	}
+
+	found := false
+	for _, row := range RadarCapabilityRuntime() {
+		capability, _ := row["capability"].(r.Capability)
+		if capability.Network == "ton-mainnet" {
+			found = true
+			if row["runtime_status"] != "primary_configured" || row["live_verified"] != false {
+				t.Fatalf("unexpected TON runtime status: %#v", row)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("TON capability missing from runtime report")
+	}
+	encoded, err := json.Marshal(RadarCapabilityRuntime())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(encoded), key) {
+		t.Fatal("capability runtime output leaked the toncenter key")
+	}
+}
+
+func TestToncenterKeyFallbackNeverOverridesExplicitTonEntry(t *testing.T) {
+	t.Setenv("TONCENTER_API_KEY", "fixture-toncenter-key-not-real")
+	t.Setenv("RADAR_PROVIDERS_JSON", `{"ton-mainnet":{"primary":{"url":"https://ton-operator.example.invalid"}}}`)
+	ton := RadarProviderConfig()["ton-mainnet"]
+	if ton.Primary.URL != "https://ton-operator.example.invalid" || len(ton.Primary.Headers) != 0 {
+		t.Fatalf("explicit ton-mainnet entry must win, got %q", ton.Primary.URL)
+	}
+}
+
+func TestMalformedRadarProvidersFailClosedEvenWithToncenterKey(t *testing.T) {
+	t.Setenv("TONCENTER_API_KEY", "fixture-toncenter-key-not-real")
+	for _, raw := range []string{"{not-json", `["ton-mainnet"]`} {
+		t.Setenv("RADAR_PROVIDERS_JSON", raw)
+		if cfg := RadarProviderConfig(); len(cfg) != 0 {
+			t.Fatalf("malformed RADAR_PROVIDERS_JSON %q must yield no providers, got %d", raw, len(cfg))
+		}
+	}
+	t.Setenv("RADAR_PROVIDERS_JSON", "null")
+	if _, ok := RadarProviderConfig()["ton-mainnet"]; !ok {
+		t.Fatal("a JSON null provider map is empty, so the toncenter fallback should still apply")
+	}
+}
+
+func TestNoToncenterKeyLeavesTonUnconfigured(t *testing.T) {
+	t.Setenv("TONCENTER_API_KEY", "")
+	t.Setenv("RADAR_PROVIDERS_JSON", "")
+	if cfg := RadarProviderConfig(); len(cfg) != 0 {
+		t.Fatalf("no providers expected without configuration, got %d", len(cfg))
+	}
+}
