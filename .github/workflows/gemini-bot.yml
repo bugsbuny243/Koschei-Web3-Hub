@@ -67,10 +67,18 @@ jobs:
                       model="gemini-3.8-flash",
                       contents=prompt,
                   )
-          except errors.ServerError as exc:
-              if "503 UNAVAILABLE" not in str(exc):
+          except (errors.ServerError, errors.ClientError) as exc:
+              # Only known provider availability/quota failures make this
+              # optional advisory unavailable. Unexpected auth, SDK and
+              # request errors must continue to fail visibly.
+              description = str(exc)
+              if "503 UNAVAILABLE" in description:
+                  reason = "provider unavailable (503)"
+              elif "429 RESOURCE_EXHAUSTED" in description:
+                  reason = "provider daily quota exhausted (429)"
+              else:
                   raise
-              message = "Gemini advisory unavailable (provider 503); no model review was performed."
+              message = f"Gemini advisory unavailable ({reason}); no model review was performed."
               print("::notice::" + message)
               with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a", encoding="utf-8") as output:
                   output.write(message + "\n")
