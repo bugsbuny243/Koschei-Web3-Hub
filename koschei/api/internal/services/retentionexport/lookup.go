@@ -33,10 +33,10 @@ type ArchiveEvidenceMatch struct {
 }
 
 type ArchiveLookupResult struct {
-	ObjectSHA256  string                 `json:"object_sha256"`
-	VerifiedRows  int64                  `json:"verified_rows"`
-	Matches       []ArchiveEvidenceMatch `json:"matches"`
-	Truncated     bool                   `json:"truncated"`
+	ObjectSHA256 string                 `json:"object_sha256"`
+	VerifiedRows int64                  `json:"verified_rows"`
+	Matches      []ArchiveEvidenceMatch `json:"matches"`
+	Truncated    bool                   `json:"truncated"`
 }
 
 // LookupArchiveEvidence validates the exact object digest and EVERY row's
