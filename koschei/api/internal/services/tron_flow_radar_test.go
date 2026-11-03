@@ -303,3 +303,41 @@ func TestTronFlowRadarCycleReadsSolidBlocksWithKeyInHeaderOnly(t *testing.T) {
 		t.Fatalf("provider failure must surface only a category, got %v", err)
 	}
 }
+
+func TestTronFlowSnapshotListsSeedsThenLargestFollowedHolders(t *testing.T) {
+	seed, small, large, frozen := flowAddr(0x11), flowAddr(0x22), flowAddr(0x33), flowAddr(0x44)
+	checker := func(_ context.Context, address string) string {
+		if address == frozen {
+			return "frozen"
+		}
+		return "not_frozen"
+	}
+	radar := NewTronFlowRadar(flowConfig(seed), nil, nil, nil)
+	radar.state.freeze = checker
+	ctx := context.Background()
+	radar.state.process(ctx, nil, flowTransfer(1, seed, small, 20_000, 1000))
+	radar.state.process(ctx, nil, flowTransfer(2, seed, large, 3_000_000, 1001))
+	radar.state.process(ctx, nil, flowTransfer(3, seed, frozen, 2_000_000, 1002))
+
+	snapshot := radar.Snapshot()
+	got := []string{}
+	for _, item := range snapshot.TopFollowed {
+		got = append(got, item.Address+":"+item.USDTFreezeState)
+	}
+	want := []string{
+		TronBase58(seed) + ":not_checked", TronBase58(large) + ":not_frozen", TronBase58(frozen) + ":frozen", TronBase58(small) + ":not_checked",
+	}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("top followed = %v, want %v", got, want)
+	}
+	if snapshot.TopFollowed[1].Received != "3000000 USDT" || snapshot.TopFollowed[1].Hop != 1 || snapshot.TopFollowed[1].OriginSeed != TronBase58(seed) {
+		t.Fatalf("unexpected followed row %+v", snapshot.TopFollowed[1])
+	}
+	if snapshot.Settings.MaxHops != 3 || snapshot.Settings.MinFollow != "10000 USDT" || snapshot.Storage != "in_memory_only" {
+		t.Fatalf("unexpected settings %+v", snapshot.Settings)
+	}
+	encoded, _ := json.Marshal(snapshot)
+	if strings.Contains(string(encoded), "TRON-PRO-API-KEY") || strings.Contains(string(encoded), "api_key") {
+		t.Fatal("snapshot must not carry provider credentials")
+	}
+}

@@ -16,6 +16,8 @@ func registerDefenseOSRoutes(mux *http.ServeMux, h *handlers.Handler) {
 	mux.HandleFunc("/api/owner/actor-memory/matches", requiresDB(h, ownerOnly(h, method("GET", h.OwnerActorOperationalMemory))))
 
 	mux.HandleFunc("/api/owner/radar/capabilities", ownerOnly(h, method("GET", h.OwnerRadarCapabilities)))
+	// In-memory Tron Flow Radar state; owner-only and database-free.
+	mux.HandleFunc("/api/owner/radar/tron-flow", ownerOnly(h, method("GET", h.OwnerTronFlowRadar)))
 	mux.HandleFunc("/api/owner/radar/investigate", ownerOnly(h, method("POST", h.RadarInvestigate)))
 
 	// Defense OS is intentionally dormant by default while Koschei is in its

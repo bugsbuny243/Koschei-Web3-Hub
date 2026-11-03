@@ -19,6 +19,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"koschei/api/internal/radaradapter/tron"
@@ -290,6 +291,7 @@ type tronFlowNode struct {
 	outTimesMS   []int64
 	burstUntilMS int64
 	freezeDone   bool
+	freezeState  string
 }
 
 // tronFlowState is the in-memory graph. It is not safe for concurrent use;
@@ -477,6 +479,7 @@ func (s *tronFlowState) process(ctx context.Context, sink TronFlowSink, t TronFl
 	target.taintedRaw.Add(target.taintedRaw, t.ValueRaw)
 	if !target.seed && !target.freezeDone && target.taintedRaw.Cmp(s.cfg.FreezeCheckRaw) >= 0 && s.freeze != nil {
 		state := s.freeze(ctx, t.To)
+		target.freezeState = state
 		if state == "frozen" || state == "not_frozen" {
 			target.freezeDone = true
 		}
@@ -513,16 +516,73 @@ func (s *tronFlowState) evictIfFull() {
 	}
 }
 
+type TronFlowFollowedAddress struct {
+	Address         string `json:"address"`
+	Hop             int    `json:"hop"`
+	OriginSeed      string `json:"origin_seed"`
+	Seed            bool   `json:"seed"`
+	ReceivedRaw     string `json:"followed_received_raw"`
+	Received        string `json:"followed_received"`
+	LastActivityMS  int64  `json:"last_activity_block_timestamp_ms"`
+	USDTFreezeState string `json:"usdt_freeze_state"`
+}
+
+type TronFlowRadarSettings struct {
+	MinFollow          string `json:"min_follow"`
+	MaxHops            int    `json:"max_hops"`
+	BurstCount         int    `json:"burst_count"`
+	BurstWindowSeconds int    `json:"burst_window_seconds"`
+	FreezeCheck        string `json:"freeze_check"`
+	BridgeAlert        string `json:"bridge_alert"`
+	PinnedBridges      int    `json:"pinned_bridges"`
+	MaxTracked         int    `json:"max_tracked"`
+	MaxFindingsPerHour int    `json:"max_findings_per_hour"`
+}
+
+const tronFlowTopFollowed = 25
+
+// topFollowed lists seeds first, then followed addresses holding the most
+// followed USDT.
+func (s *tronFlowState) topFollowed(limit int) []TronFlowFollowedAddress {
+	out := make([]TronFlowFollowedAddress, 0, len(s.nodes))
+	for address, node := range s.nodes {
+		out = append(out, TronFlowFollowedAddress{
+			Address: tronFlowDisplay(address), Hop: node.hop, OriginSeed: tronFlowDisplay(node.origin), Seed: node.seed,
+			ReceivedRaw: node.taintedRaw.String(), Received: tronFlowAmount(node.taintedRaw), LastActivityMS: node.lastSeenMS,
+			USDTFreezeState: firstNonEmptyString(node.freezeState, "not_checked"),
+		})
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].Seed != out[j].Seed {
+			return out[i].Seed
+		}
+		left, _ := new(big.Int).SetString(out[i].ReceivedRaw, 10)
+		right, _ := new(big.Int).SetString(out[j].ReceivedRaw, 10)
+		if cmp := left.Cmp(right); cmp != 0 {
+			return cmp > 0
+		}
+		return out[i].Address < out[j].Address
+	})
+	if len(out) > limit {
+		out = out[:limit]
+	}
+	return out
+}
+
 type TronFlowRadarSnapshot struct {
-	Running        bool              `json:"running"`
-	Cursor         uint64            `json:"cursor,string"`
-	Head           uint64            `json:"head,string"`
-	Seeds          int               `json:"seeds"`
-	Followed       int               `json:"followed_addresses"`
-	Transfers      uint64            `json:"usdt_transfers_processed,string"`
-	Suppressed     int               `json:"findings_suppressed_this_hour"`
-	RecentFindings []TronFlowFinding `json:"recent_findings"`
-	Storage        string            `json:"storage"`
+	Running        bool                      `json:"running"`
+	Cursor         uint64                    `json:"cursor,string"`
+	Head           uint64                    `json:"head,string"`
+	Seeds          int                       `json:"seeds"`
+	Followed       int                       `json:"followed_addresses"`
+	Transfers      uint64                    `json:"usdt_transfers_processed,string"`
+	Suppressed     int                       `json:"findings_suppressed_this_hour"`
+	RecentFindings []TronFlowFinding         `json:"recent_findings"`
+	TopFollowed    []TronFlowFollowedAddress `json:"top_followed"`
+	Settings       TronFlowRadarSettings     `json:"settings"`
+	LastError      string                    `json:"last_error,omitempty"`
+	LastCycleAt    *time.Time                `json:"last_cycle_at,omitempty"`
+	Storage        string                    `json:"storage"`
 }
 
 type TronFlowRadar struct {
@@ -532,12 +592,20 @@ type TronFlowRadar struct {
 	health *runtimehealth.Registry
 	db     *sql.DB
 
-	mu      sync.Mutex
-	state   *tronFlowState
-	cursor  uint64
-	head    uint64
-	running bool
+	mu        sync.Mutex
+	state     *tronFlowState
+	cursor    uint64
+	head      uint64
+	running   bool
+	lastError string
+	lastCycle time.Time
 }
+
+var activeTronFlowRadar atomic.Pointer[TronFlowRadar]
+
+// ActiveTronFlowRadar returns the radar started in this process, or nil when
+// it is disabled or this process role runs no background workers.
+func ActiveTronFlowRadar() *TronFlowRadar { return activeTronFlowRadar.Load() }
 
 func NewTronFlowRadar(cfg TronFlowRadarConfig, db *sql.DB, sink TronFlowSink, health *runtimehealth.Registry) *TronFlowRadar {
 	r := &TronFlowRadar{cfg: cfg, sink: sink, health: health, db: db,
@@ -557,8 +625,21 @@ func (r *TronFlowRadar) Snapshot() TronFlowRadarSnapshot {
 	}
 	findings := append([]TronFlowFinding(nil), r.state.findings...)
 	sort.SliceStable(findings, func(i, j int) bool { return findings[i].ObservedAt.After(findings[j].ObservedAt) })
-	return TronFlowRadarSnapshot{Running: r.running, Cursor: r.cursor, Head: r.head, Seeds: seeds, Followed: len(r.state.nodes),
-		Transfers: r.state.transfers, Suppressed: r.state.suppressed, RecentFindings: findings, Storage: "in_memory_only"}
+	snapshot := TronFlowRadarSnapshot{Running: r.running, Cursor: r.cursor, Head: r.head, Seeds: seeds, Followed: len(r.state.nodes),
+		Transfers: r.state.transfers, Suppressed: r.state.suppressed, RecentFindings: findings,
+		TopFollowed: r.state.topFollowed(tronFlowTopFollowed), LastError: r.lastError, Storage: "in_memory_only",
+		Settings: TronFlowRadarSettings{
+			MinFollow: tronFlowAmount(r.cfg.MinFollowRaw), MaxHops: r.cfg.MaxHops, BurstCount: r.cfg.BurstCount,
+			BurstWindowSeconds: int(r.cfg.BurstWindow.Seconds()), FreezeCheck: tronFlowAmount(r.cfg.FreezeCheckRaw),
+			BridgeAlert: tronFlowAmount(r.cfg.BridgeAlertRaw), PinnedBridges: len(r.state.bridges), MaxTracked: r.cfg.MaxTracked,
+			MaxFindingsPerHour: r.cfg.MaxFindings,
+		},
+	}
+	if !r.lastCycle.IsZero() {
+		at := r.lastCycle.UTC()
+		snapshot.LastCycleAt = &at
+	}
+	return snapshot
 }
 
 // post never returns the URL, API key or upstream body in errors.
@@ -697,6 +778,7 @@ func (r *TronFlowRadar) Start(ctx context.Context) func() {
 		r.health.Register(TronFlowRadarHealthID, "worker", "tron-mainnet", true)
 	}
 	runCtx, cancel := context.WithCancel(ctx)
+	activeTronFlowRadar.Store(r)
 	go func() {
 		r.mu.Lock()
 		r.running = true
@@ -715,6 +797,12 @@ func (r *TronFlowRadar) Start(ctx context.Context) func() {
 				lastSeedRefresh = time.Now()
 			}
 			processed, err := r.cycle(runCtx)
+			r.mu.Lock()
+			r.lastCycle, r.lastError = time.Now(), ""
+			if err != nil {
+				r.lastError = err.Error() // error categories only; never URLs or keys
+			}
+			r.mu.Unlock()
 			snapshot := r.Snapshot()
 			head, cursor := snapshot.Head, snapshot.Cursor
 			if r.health != nil {
