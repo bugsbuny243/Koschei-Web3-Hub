@@ -120,4 +120,18 @@ func TestArchiveEvidenceLookupVerifiesWholeObjectPostgres17(t *testing.T) {
 		!strings.Contains(err.Error(), "integrity verification failed") || len(matches.Matches) != 0 {
 		t.Fatalf("nonmatching corrupt archive row leaked a result: %+v err=%v", matches, err)
 	}
+
+	// An attacker could preserve the correct canonical payload checksum
+	// while changing only the untrusted source_id metadata in the object.
+	// Even that unrelated row invalidates the whole lookup response.
+	forged := append([]ArchiveRow(nil), rows...)
+	forged[1].SourceID = "forged-source-identity"
+	forgedObject, err := serializeBatch(forged)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if matches, err := LookupArchiveEvidence(ctx, db, forgedObject, sha256Hex(forgedObject), filter); err == nil ||
+		!strings.Contains(err.Error(), "source identity parity failed") || len(matches.Matches) != 0 {
+		t.Fatalf("forged source identity was treated as verified evidence: %+v err=%v", matches, err)
+	}
 }
