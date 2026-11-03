@@ -1,18 +1,13 @@
 package handlers
 
 import (
-	"bytes"
 	"context"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"math/big"
 	"net/http"
-	"net/url"
 	"os"
-	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -25,21 +20,16 @@ import (
 // transfers and for the USDT issuer freeze state. In the October/November 2026
 // Binance incident about $242M of Tron funds left through bridges within two
 // days while Tether's freeze covered the rest; an hourly refresh cannot report
-// inside that window. Alerts report indexed observations only: they never
-// identify who controls the wallet, never claim a transfer was malicious and
-// never claim Koschei can stop or reverse an on-chain transfer.
+// inside that window. Collection and decoding live in the Tron adapter
+// (radaradapter/tron); this consumer only compares normalized observations.
+// Alerts never identify who controls the wallet, never claim a transfer was
+// malicious and never claim Koschei can stop or reverse an on-chain transfer.
 
 const (
-	watchlistTronNetwork = "tron-mainnet"
-	// Tether USD (TRC-20) contract, validated by Base58Check at runtime.
-	watchlistTronUSDTContract   = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t"
+	watchlistTronNetwork        = "tron-mainnet"
 	watchlistTronPageLimit      = 50
 	watchlistTronMaxAlerts      = 10
 	watchlistTronBurstThreshold = 5
-	watchlistTronMaxResponse    = 2 << 20
-	watchlistTronFreezeFrozen   = "frozen"
-	watchlistTronFreezeClear    = "not_frozen"
-	watchlistTronFreezeUnknown  = "unknown"
 	// TronGrid can index a confirmed transfer after newer ones; an unseen
 	// transfer up to this much older than the newest seen one still alerts.
 	watchlistTronIndexLagMS = int64(10 * 60 * 1000)
@@ -51,39 +41,31 @@ var (
 	watchlistTronHTTPClient *http.Client
 )
 
-var watchlistTronUnsignedDecimal = regexp.MustCompile(`^[0-9]{1,78}$`)
+func watchlistTronGrid() tron.GridClient {
+	return tron.GridClient{BaseURL: watchlistTronBaseURL, APIKey: os.Getenv("TRONGRID_API_KEY"), HTTP: watchlistTronHTTPClient}
+}
 
+// watchlistTronTransfer is a normalized adapter transfer plus display fields
+// and the operator bridge tag.
 type watchlistTronTransfer struct {
-	TransactionID    string `json:"transaction_id"`
-	Asset            string `json:"asset"`
-	TokenContract    string `json:"token_contract,omitempty"`
-	TokenSymbol      string `json:"token_symbol,omitempty"`
-	To               string `json:"to"`
-	ToBase58         string `json:"to_base58,omitempty"`
-	ValueRaw         string `json:"value_raw"`
-	Decimals         *int   `json:"decimals,omitempty"`
-	Amount           string `json:"amount"`
-	BlockTimestampMS int64  `json:"block_timestamp_ms"`
-	BridgeLabel      string `json:"bridge_label,omitempty"`
-	BridgeSource     string `json:"bridge_source,omitempty"`
+	tron.Transfer
+	ToBase58     string `json:"to_base58,omitempty"`
+	Amount       string `json:"amount"`
+	BridgeLabel  string `json:"bridge_label,omitempty"`
+	BridgeSource string `json:"bridge_source,omitempty"`
 }
 
 type watchlistTronWalletSnapshot struct {
-	Network           string                 `json:"network"`
-	Address           string                 `json:"address_hex"`
-	SeenOutboundTxIDs []string               `json:"seen_outbound_transaction_ids"`
-	LatestOutboundMS  int64                  `json:"latest_outbound_block_timestamp_ms"`
-	LastOutbound      *watchlistTronTransfer `json:"last_outbound,omitempty"`
+	Network              string                 `json:"network"`
+	Address              string                 `json:"address_hex"`
+	SeenOutboundEventIDs []string               `json:"seen_outbound_event_ids"`
+	LatestOutboundMS     int64                  `json:"latest_outbound_block_timestamp_ms"`
+	LastOutbound         *watchlistTronTransfer `json:"last_outbound,omitempty"`
 	// USDTFreezeState is this check's observation ("unknown" when unreadable);
 	// USDTFreezeLastKnown is the latest readable state, used for transitions.
 	USDTFreezeState     string `json:"usdt_freeze_state"`
 	USDTFreezeLastKnown string `json:"usdt_freeze_last_known,omitempty"`
 	CheckedAt           string `json:"checked_at"`
-}
-
-type watchlistTronBridge struct {
-	Label  string `json:"label"`
-	Source string `json:"source"`
 }
 
 func watchlistTronWalletNetwork(network string) bool {
@@ -101,213 +83,18 @@ func watchlistTronCheckInterval() time.Duration {
 	return time.Minute
 }
 
-// watchlistTronBridges reads the operator-pinned bridge/swap deposit registry
-// shared with the Tron Flow Radar.
-func watchlistTronBridges() map[string]watchlistTronBridge {
-	out := map[string]watchlistTronBridge{}
-	for address, bridge := range services.TronPinnedBridges() {
-		out[address] = watchlistTronBridge{Label: bridge.Label, Source: bridge.Source}
+// decorateWatchlistTronTransfers adds display fields and the bridge tag from
+// the operator-pinned registry shared with the Tron Flow Radar.
+func decorateWatchlistTronTransfers(transfers []tron.Transfer, bridges map[string]services.TronBridge) []watchlistTronTransfer {
+	out := make([]watchlistTronTransfer, 0, len(transfers))
+	for _, transfer := range transfers {
+		item := watchlistTronTransfer{Transfer: transfer, ToBase58: tron.Base58(transfer.To), Amount: formatWatchlistTronAmount(transfer.ValueRaw, transfer.Decimals)}
+		if bridge, ok := bridges[transfer.To]; ok {
+			item.BridgeLabel, item.BridgeSource = bridge.Label, bridge.Source
+		}
+		out = append(out, item)
 	}
 	return out
-}
-
-func watchlistTronClient() *http.Client {
-	if watchlistTronHTTPClient != nil {
-		return watchlistTronHTTPClient
-	}
-	return &http.Client{Timeout: 10 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-}
-
-// watchlistTronDo never returns the request URL or upstream body in errors.
-func watchlistTronDo(ctx context.Context, method, path string, body any) ([]byte, error) {
-	var reader io.Reader
-	if body != nil {
-		encoded, err := json.Marshal(body)
-		if err != nil {
-			return nil, errors.New("tron_request_encoding_failed")
-		}
-		reader = bytes.NewReader(encoded)
-	}
-	req, err := http.NewRequestWithContext(ctx, method, strings.TrimRight(watchlistTronBaseURL, "/")+path, reader)
-	if err != nil {
-		return nil, errors.New("tron_request_invalid")
-	}
-	req.Header.Set("Accept", "application/json")
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
-	if key := strings.TrimSpace(os.Getenv("TRONGRID_API_KEY")); key != "" {
-		req.Header.Set("TRON-PRO-API-KEY", key)
-	}
-	res, err := watchlistTronClient().Do(req)
-	if err != nil {
-		return nil, errors.New("tron_provider_unavailable")
-	}
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("tron_provider_http_%d", res.StatusCode)
-	}
-	raw, err := io.ReadAll(io.LimitReader(res.Body, watchlistTronMaxResponse+1))
-	if err != nil || len(raw) > watchlistTronMaxResponse {
-		return nil, errors.New("tron_provider_response_too_large")
-	}
-	return raw, nil
-}
-
-func watchlistTronFetchTRC20Outbound(ctx context.Context, base58, hexAddress string, bridges map[string]watchlistTronBridge) ([]watchlistTronTransfer, error) {
-	raw, err := watchlistTronDo(ctx, http.MethodGet, fmt.Sprintf("/v1/accounts/%s/transactions/trc20?only_confirmed=true&only_from=true&limit=%d", url.PathEscape(base58), watchlistTronPageLimit), nil)
-	if err != nil {
-		return nil, err
-	}
-	return parseWatchlistTronTRC20(raw, hexAddress, bridges)
-}
-
-func parseWatchlistTronTRC20(raw []byte, hexAddress string, bridges map[string]watchlistTronBridge) ([]watchlistTronTransfer, error) {
-	var payload struct {
-		Success bool `json:"success"`
-		Data    []struct {
-			ID        string `json:"transaction_id"`
-			From      string `json:"from"`
-			To        string `json:"to"`
-			Type      string `json:"type"`
-			Value     string `json:"value"`
-			Timestamp int64  `json:"block_timestamp"`
-			Token     struct {
-				Address  string `json:"address"`
-				Symbol   string `json:"symbol"`
-				Decimals *int   `json:"decimals"`
-			} `json:"token_info"`
-		} `json:"data"`
-	}
-	if json.Unmarshal(raw, &payload) != nil || !payload.Success {
-		return nil, errors.New("tron_trc20_response_invalid")
-	}
-	out := []watchlistTronTransfer{}
-	for i, item := range payload.Data {
-		if i >= watchlistTronPageLimit {
-			break
-		}
-		from, fe := tron.Address(item.From)
-		to, te := tron.Address(item.To)
-		token, ce := tron.Address(item.Token.Address)
-		id, ie := hex.DecodeString(item.ID)
-		if fe != nil || te != nil || ce != nil || ie != nil || len(id) != 32 || from != hexAddress || item.Type != "Transfer" ||
-			item.Timestamp <= 0 || !watchlistTronUnsignedDecimal.MatchString(item.Value) {
-			continue
-		}
-		transfer := watchlistTronTransfer{
-			TransactionID: strings.ToLower(item.ID), Asset: "trc20", TokenContract: token, To: to,
-			ValueRaw: item.Value, BlockTimestampMS: item.Timestamp,
-		}
-		if symbol := strings.TrimSpace(item.Token.Symbol); symbol != "" && len(symbol) <= 16 {
-			transfer.TokenSymbol = symbol
-		}
-		if item.Token.Decimals != nil && *item.Token.Decimals >= 0 && *item.Token.Decimals <= 36 {
-			decimals := *item.Token.Decimals
-			transfer.Decimals = &decimals
-		}
-		tagWatchlistTronBridge(&transfer, bridges)
-		out = append(out, transfer)
-	}
-	return out, nil
-}
-
-func watchlistTronFetchTRXOutbound(ctx context.Context, base58, hexAddress string, bridges map[string]watchlistTronBridge) ([]watchlistTronTransfer, error) {
-	raw, err := watchlistTronDo(ctx, http.MethodGet, fmt.Sprintf("/v1/accounts/%s/transactions?only_confirmed=true&only_from=true&limit=%d", url.PathEscape(base58), watchlistTronPageLimit), nil)
-	if err != nil {
-		return nil, err
-	}
-	return parseWatchlistTronTRX(raw, hexAddress, bridges)
-}
-
-func parseWatchlistTronTRX(raw []byte, hexAddress string, bridges map[string]watchlistTronBridge) ([]watchlistTronTransfer, error) {
-	var payload struct {
-		Success bool `json:"success"`
-		Data    []struct {
-			ID        string `json:"txID"`
-			Timestamp int64  `json:"block_timestamp"`
-			Ret       []struct {
-				ContractRet string `json:"contractRet"`
-			} `json:"ret"`
-			RawData struct {
-				Contract []struct {
-					Type      string `json:"type"`
-					Parameter struct {
-						Value struct {
-							Amount       json.Number `json:"amount"`
-							OwnerAddress string      `json:"owner_address"`
-							ToAddress    string      `json:"to_address"`
-						} `json:"value"`
-					} `json:"parameter"`
-				} `json:"contract"`
-			} `json:"raw_data"`
-		} `json:"data"`
-	}
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.UseNumber()
-	if decoder.Decode(&payload) != nil || !payload.Success {
-		return nil, errors.New("tron_trx_response_invalid")
-	}
-	sixDecimals := 6
-	out := []watchlistTronTransfer{}
-	for i, item := range payload.Data {
-		if i >= watchlistTronPageLimit {
-			break
-		}
-		if len(item.RawData.Contract) != 1 || item.RawData.Contract[0].Type != "TransferContract" || len(item.Ret) == 0 || item.Ret[0].ContractRet != "SUCCESS" {
-			continue
-		}
-		value := item.RawData.Contract[0].Parameter.Value
-		from, fe := tron.Address(value.OwnerAddress)
-		to, te := tron.Address(value.ToAddress)
-		id, ie := hex.DecodeString(item.ID)
-		amount := value.Amount.String()
-		if fe != nil || te != nil || ie != nil || len(id) != 32 || from != hexAddress || item.Timestamp <= 0 || !watchlistTronUnsignedDecimal.MatchString(amount) {
-			continue
-		}
-		transfer := watchlistTronTransfer{
-			TransactionID: strings.ToLower(item.ID), Asset: "trx", TokenSymbol: "TRX", To: to,
-			ValueRaw: amount, Decimals: &sixDecimals, BlockTimestampMS: item.Timestamp,
-		}
-		tagWatchlistTronBridge(&transfer, bridges)
-		out = append(out, transfer)
-	}
-	return out, nil
-}
-
-// tagWatchlistTronBridge also fills the display amount; TRC-20 decimals come
-// from the indexer and are unverified, TRX uses the protocol's 6 decimals.
-func tagWatchlistTronBridge(transfer *watchlistTronTransfer, bridges map[string]watchlistTronBridge) {
-	transfer.Amount = formatWatchlistTronAmount(transfer.ValueRaw, transfer.Decimals)
-	transfer.ToBase58 = watchlistTronBase58(transfer.To)
-	if bridge, ok := bridges[transfer.To]; ok {
-		transfer.BridgeLabel, transfer.BridgeSource = bridge.Label, bridge.Source
-	}
-}
-
-// watchlistTronUSDTFreezeState reads Tether's TRC-20 isBlackListed(address)
-// through a constant (read-only) call. Any failure yields "unknown", never
-// "not_frozen".
-func watchlistTronUSDTFreezeState(ctx context.Context, hexAddress string) string {
-	contract, err := tron.Address(watchlistTronUSDTContract)
-	if err != nil || len(hexAddress) != 42 {
-		return watchlistTronFreezeUnknown
-	}
-	raw, err := watchlistTronDo(ctx, http.MethodPost, "/wallet/triggerconstantcontract", map[string]any{
-		"owner_address":     hexAddress,
-		"contract_address":  contract,
-		"function_selector": "isBlackListed(address)",
-		"parameter":         strings.Repeat("0", 24) + hexAddress[2:],
-		"visible":           false,
-	})
-	if err != nil {
-		return watchlistTronFreezeUnknown
-	}
-	return parseWatchlistTronFreezeState(raw)
-}
-
-func parseWatchlistTronFreezeState(raw []byte) string {
-	return services.ParseTronUSDTFreezeWord(raw)
 }
 
 // formatWatchlistTronAmount renders an integer amount with its decimals,
@@ -317,22 +104,7 @@ func formatWatchlistTronAmount(valueRaw string, decimals *int) string {
 	if !ok || decimals == nil {
 		return valueRaw + " (raw units)"
 	}
-	if *decimals == 0 {
-		return value.String()
-	}
-	scale := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(*decimals)), nil)
-	whole, fraction := new(big.Int).QuoRem(value, scale, new(big.Int))
-	frac := fmt.Sprintf("%0*s", *decimals, fraction.String())
-	frac = strings.TrimRight(frac, "0")
-	if frac == "" {
-		return whole.String()
-	}
-	return whole.String() + "." + frac
-}
-
-// watchlistTronBase58 renders a 41-hex address in Base58Check wallet form.
-func watchlistTronBase58(hexAddress string) string {
-	return services.TronBase58(hexAddress)
+	return tron.FormatUnits(value, *decimals)
 }
 
 func (t watchlistTronTransfer) displayTo() string {
@@ -349,19 +121,19 @@ func (t watchlistTronTransfer) assetLabel() string {
 	return "token " + t.TokenContract
 }
 
-// newWatchlistTronOutbound returns transfers not seen at the previous check,
-// newest first. The first check is a baseline and reports no history.
+// newWatchlistTronOutbound returns transfer events not seen at the previous
+// check, newest first. The first check is a baseline and reports no history.
 func newWatchlistTronOutbound(previous *watchlistTronWalletSnapshot, fetched []watchlistTronTransfer) []watchlistTronTransfer {
 	if previous == nil {
 		return nil
 	}
 	seen := map[string]struct{}{}
-	for _, id := range previous.SeenOutboundTxIDs {
+	for _, id := range previous.SeenOutboundEventIDs {
 		seen[id] = struct{}{}
 	}
 	out := []watchlistTronTransfer{}
 	for _, transfer := range fetched {
-		if _, ok := seen[transfer.TransactionID]; ok || transfer.BlockTimestampMS < previous.LatestOutboundMS-watchlistTronIndexLagMS {
+		if _, ok := seen[transfer.EventID]; ok || transfer.BlockTimestampMS < previous.LatestOutboundMS-watchlistTronIndexLagMS {
 			continue
 		}
 		out = append(out, transfer)
@@ -381,10 +153,11 @@ func watchlistTronResponseOptions(transfer watchlistTronTransfer, usdtContract s
 	return append(options, "receiving_party_notice")
 }
 
-// compareWatchlistTronWallet turns new outbound transfers and USDT freeze
-// changes into alerts.
+// compareWatchlistTronWallet turns new outbound transfer events and USDT
+// freeze changes into alerts. Alerts are keyed by event, not transaction, so
+// a batch transaction's transfers stay individually observable.
 func compareWatchlistTronWallet(previous *watchlistTronWalletSnapshot, current watchlistTronWalletSnapshot, fresh []watchlistTronTransfer) []watchlistAlertCandidate {
-	usdtContract, _ := tron.Address(watchlistTronUSDTContract)
+	usdtContract, _ := tron.Address(tron.USDTContract)
 	alerts := []watchlistAlertCandidate{}
 	baseEvidence := func() map[string]any {
 		return map[string]any{
@@ -400,7 +173,7 @@ func compareWatchlistTronWallet(previous *watchlistTronWalletSnapshot, current w
 		evidence := baseEvidence()
 		evidence["transfer"] = transfer
 		evidence["response_options"] = watchlistTronResponseOptions(transfer, usdtContract)
-		amount := formatWatchlistTronAmount(transfer.ValueRaw, transfer.Decimals) + " " + transfer.assetLabel()
+		amount := transfer.Amount + " " + transfer.assetLabel()
 		stop := "Koschei cannot reverse an on-chain transfer. "
 		if transfer.TokenContract != "" && transfer.TokenContract == usdtContract {
 			stop += "Only Tether can freeze USDT; report the transaction ID and destination to Tether and law enforcement now."
@@ -411,14 +184,14 @@ func compareWatchlistTronWallet(previous *watchlistTronWalletSnapshot, current w
 			alerts = append(alerts, watchlistAlertCandidate{
 				EventType: "tron_bridge_exit", Severity: "critical", Title: "Funds sent to a pinned bridge/swap address",
 				Message:       amount + " left the watched wallet to " + transfer.BridgeLabel + " (" + transfer.displayTo() + "). Funds may leave Tron. " + stop,
-				PreviousValue: nil, CurrentValue: transfer.TransactionID, Evidence: evidence,
+				PreviousValue: nil, CurrentValue: transfer.EventID, Evidence: evidence,
 			})
 			continue
 		}
 		alerts = append(alerts, watchlistAlertCandidate{
 			EventType: "tron_outbound_transfer", Severity: "high", Title: "Outbound transfer from a watched Tron wallet",
 			Message:       amount + " was sent to " + transfer.displayTo() + ". If you did not authorize this, treat the wallet as compromised. " + stop,
-			PreviousValue: nil, CurrentValue: transfer.TransactionID, Evidence: evidence,
+			PreviousValue: nil, CurrentValue: transfer.EventID, Evidence: evidence,
 		})
 	}
 	if len(fresh) >= watchlistTronBurstThreshold {
@@ -439,22 +212,22 @@ func compareWatchlistTronWallet(previous *watchlistTronWalletSnapshot, current w
 	previousKnown := ""
 	if previous != nil {
 		previousKnown = previous.USDTFreezeLastKnown
-		if previousKnown == "" && previous.USDTFreezeState != watchlistTronFreezeUnknown {
+		if previousKnown == "" && previous.USDTFreezeState != tron.FreezeUnknown {
 			previousKnown = previous.USDTFreezeState
 		}
 	}
 	switch {
-	case previousKnown == "" && current.USDTFreezeState == watchlistTronFreezeFrozen:
+	case previousKnown == "" && current.USDTFreezeState == tron.FreezeFrozen:
 		alerts = append(alerts, watchlistAlertCandidate{
 			EventType: "tron_usdt_frozen_present", Severity: "info", Title: "USDT on this wallet is frozen by the issuer",
 			Message: "Tether's USDT contract lists this address as frozen. It does not freeze TRX or other tokens.", CurrentValue: current.USDTFreezeState, Evidence: freezeEvidence,
 		})
-	case previousKnown == watchlistTronFreezeClear && current.USDTFreezeState == watchlistTronFreezeFrozen:
+	case previousKnown == tron.FreezeClear && current.USDTFreezeState == tron.FreezeFrozen:
 		alerts = append(alerts, watchlistAlertCandidate{
 			EventType: "tron_usdt_frozen", Severity: "info", Title: "Issuer froze USDT on a watched wallet",
 			Message: "Tether's USDT contract now lists this address as frozen. TRX and other tokens can still move.", PreviousValue: previousKnown, CurrentValue: current.USDTFreezeState, Evidence: freezeEvidence,
 		})
-	case previousKnown == watchlistTronFreezeFrozen && current.USDTFreezeState == watchlistTronFreezeClear:
+	case previousKnown == tron.FreezeFrozen && current.USDTFreezeState == tron.FreezeClear:
 		alerts = append(alerts, watchlistAlertCandidate{
 			EventType: "tron_usdt_unfrozen", Severity: "high", Title: "USDT freeze lifted on a watched wallet",
 			Message: "Tether's USDT contract no longer lists this address as frozen; its USDT can move again.", PreviousValue: previousKnown, CurrentValue: current.USDTFreezeState, Evidence: freezeEvidence,
@@ -465,23 +238,24 @@ func compareWatchlistTronWallet(previous *watchlistTronWalletSnapshot, current w
 
 func (h *Handler) refreshWatchlistTronWallet(ctx context.Context, authSubject string, target watchlistTarget, oldSnapshotRaw []byte) (watchlistTarget, int, error) {
 	interval := watchlistEVMNextCheck(watchlistTronCheckInterval())
-	hexAddress, err := tron.Address(strings.TrimSpace(target.Target))
+	base58 := strings.TrimSpace(target.Target)
+	hexAddress, err := tron.Address(base58)
 	if err == nil && !watchlistTronConfigured() {
 		err = errors.New("tron_provider_not_configured")
 	}
 	var fetched []watchlistTronTransfer
-	freezeState := watchlistTronFreezeUnknown
+	freezeState := tron.FreezeUnknown
 	if err == nil {
 		probeCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
-		bridges := watchlistTronBridges()
-		var trc20, trx []watchlistTronTransfer
-		trc20, err = watchlistTronFetchTRC20Outbound(probeCtx, strings.TrimSpace(target.Target), hexAddress, bridges)
+		grid := watchlistTronGrid()
+		var trc20, trx []tron.Transfer
+		trc20, err = grid.OutboundTRC20(probeCtx, base58, hexAddress)
 		if err == nil {
-			trx, err = watchlistTronFetchTRXOutbound(probeCtx, strings.TrimSpace(target.Target), hexAddress, bridges)
+			trx, err = grid.OutboundTRX(probeCtx, base58, hexAddress)
 		}
 		if err == nil {
-			fetched = append(trc20, trx...)
-			freezeState = watchlistTronUSDTFreezeState(probeCtx, hexAddress)
+			fetched = decorateWatchlistTronTransfers(append(trc20, trx...), services.TronPinnedBridges())
+			freezeState = grid.USDTFreezeState(probeCtx, hexAddress)
 		}
 		cancel()
 	}
@@ -539,10 +313,10 @@ func (h *Handler) refreshWatchlistTronWallet(ctx context.Context, authSubject st
 // so a transfer that scrolls out of the bounded page is not re-reported.
 func buildWatchlistTronSnapshot(previous *watchlistTronWalletSnapshot, hexAddress string, fetched []watchlistTronTransfer, freezeState string) watchlistTronWalletSnapshot {
 	current := watchlistTronWalletSnapshot{
-		Network: watchlistTronNetwork, Address: hexAddress, SeenOutboundTxIDs: []string{},
+		Network: watchlistTronNetwork, Address: hexAddress, SeenOutboundEventIDs: []string{},
 		USDTFreezeState: freezeState, CheckedAt: time.Now().UTC().Format(time.RFC3339),
 	}
-	if freezeState != watchlistTronFreezeUnknown {
+	if freezeState != tron.FreezeUnknown {
 		current.USDTFreezeLastKnown = freezeState
 	}
 	if previous != nil {
@@ -552,14 +326,14 @@ func buildWatchlistTronSnapshot(previous *watchlistTronWalletSnapshot, hexAddres
 			// An unreadable freeze state is recorded as unknown; the last
 			// readable state is carried separately so no transition is invented.
 			current.USDTFreezeLastKnown = previous.USDTFreezeLastKnown
-			if current.USDTFreezeLastKnown == "" && previous.USDTFreezeState != watchlistTronFreezeUnknown {
+			if current.USDTFreezeLastKnown == "" && previous.USDTFreezeState != tron.FreezeUnknown {
 				current.USDTFreezeLastKnown = previous.USDTFreezeState
 			}
 		}
 	}
 	for i := range fetched {
 		transfer := fetched[i]
-		current.SeenOutboundTxIDs = append(current.SeenOutboundTxIDs, transfer.TransactionID)
+		current.SeenOutboundEventIDs = append(current.SeenOutboundEventIDs, transfer.EventID)
 		if transfer.BlockTimestampMS > current.LatestOutboundMS {
 			current.LatestOutboundMS = transfer.BlockTimestampMS
 			current.LastOutbound = &transfer

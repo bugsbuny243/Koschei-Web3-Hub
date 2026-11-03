@@ -1,15 +1,10 @@
 package services
 
 import (
-	"bytes"
 	"context"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"log"
 	"math/big"
 	"net/http"
@@ -29,6 +24,10 @@ import (
 // Tron Flow Radar reads every solidified Tron block and follows USDT leaving
 // operator seed wallets across the whole network, hop by hop, in memory.
 //
+// Adapter boundary: TronGrid requests and Tron protocol decoding live in
+// radaradapter/tron. This consumer only sees normalized BlockTransfer,
+// freeze-state and balance observations.
+//
 // Storage boundary: nothing per block, per transfer or per followed address
 // is persisted. Followed addresses live in a bounded in-memory map and are
 // lost on restart. Only findings an operator can act on leave the process,
@@ -37,20 +36,23 @@ import (
 // capped per hour.
 //
 // Truth boundary: a followed address is "received funds from a seed within N
-// hops", not "controlled by the attacker". Koschei cannot stop or reverse a
-// transfer; findings name who can hold funds (Tether for USDT, the bridge
-// operator, the receiving party). The radar is observe-only and off by default.
+// hops", not "controlled by the attacker". A holder finding is made only after
+// the current USDT balance is read. Koschei cannot stop or reverse a transfer;
+// findings name who can hold funds (Tether for USDT, the bridge operator, the
+// receiving party). The radar is observe-only and off by default.
 
 const (
 	TronFlowRadarHealthID = "worker.tron-flow-radar"
 
-	tronFlowUSDTContract   = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t"
-	tronFlowTransferTopic  = "ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
-	tronFlowMaxBlockBytes  = 16 << 20
-	tronFlowMaxHeadBytes   = 1 << 20
-	tronFlowSeedRefresh    = 5 * time.Minute
-	tronFlowRecentFindings = 200
-	tronFlowUSDTDecimals   = 6
+	tronFlowSeedRefresh     = 5 * time.Minute
+	tronFlowRecentFindings  = 200
+	tronFlowTopFollowed     = 25
+	tronFlowMaxHolderChecks = 5 // per cycle, sequential, outside the state lock
+	tronFlowMaxCheckTries   = 6
+	tronFlowCheckBaseDelay  = time.Minute
+	// A busy recipient is re-checked at most this often after a readable
+	// check found its balance below the threshold.
+	tronFlowRecheckInterval = 10 * time.Minute
 )
 
 type TronBridge struct {
@@ -83,53 +85,6 @@ func TronPinnedBridges() map[string]TronBridge {
 	return out
 }
 
-// TronBase58 renders a 41-prefixed hex address in wallet Base58Check form, or
-// "" when the input is not a valid Tron address.
-func TronBase58(hexAddress string) string {
-	payload, err := hex.DecodeString(hexAddress)
-	if err != nil || len(payload) != 21 || payload[0] != 0x41 {
-		return ""
-	}
-	first := sha256.Sum256(payload)
-	second := sha256.Sum256(first[:])
-	full := append(append([]byte{}, payload...), second[:4]...)
-	const alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
-	n := new(big.Int).SetBytes(full)
-	mod := new(big.Int)
-	out := []byte{}
-	for n.Sign() > 0 {
-		n.DivMod(n, big.NewInt(58), mod)
-		out = append([]byte{alphabet[mod.Int64()]}, out...)
-	}
-	encoded := string(out)
-	if roundTrip, err := tron.Address(encoded); err != nil || roundTrip != strings.ToLower(hexAddress) {
-		return ""
-	}
-	return encoded
-}
-
-// ParseTronUSDTFreezeWord maps an isBlackListed(address) constant-call
-// response to frozen / not_frozen / unknown. It never guesses not_frozen.
-func ParseTronUSDTFreezeWord(raw []byte) string {
-	var payload struct {
-		Result struct {
-			Result bool `json:"result"`
-		} `json:"result"`
-		ConstantResult []string `json:"constant_result"`
-	}
-	if json.Unmarshal(raw, &payload) != nil || !payload.Result.Result || len(payload.ConstantResult) != 1 {
-		return "unknown"
-	}
-	switch strings.ToLower(payload.ConstantResult[0]) {
-	case strings.Repeat("0", 64):
-		return "not_frozen"
-	case strings.Repeat("0", 63) + "1":
-		return "frozen"
-	default:
-		return "unknown"
-	}
-}
-
 type TronFlowRadarConfig struct {
 	Endpoint       string
 	APIKey         string
@@ -156,12 +111,18 @@ func tronFlowEnvInt(name string, fallback, minimum, maximum int) int {
 }
 
 func tronFlowUSDTRaw(whole int) *big.Int {
-	return new(big.Int).Mul(big.NewInt(int64(whole)), new(big.Int).Exp(big.NewInt(10), big.NewInt(tronFlowUSDTDecimals), nil))
+	return new(big.Int).Mul(big.NewInt(int64(whole)), new(big.Int).Exp(big.NewInt(10), big.NewInt(tron.USDTDecimals), nil))
 }
 
-// TronFlowRadarEnabled is the observe-only opt-in; the radar never starts by default.
+// TronFlowRadarEnabled is the observe-only opt-in; the radar never starts by
+// default. It accepts 1, true, yes or on.
 func TronFlowRadarEnabled() bool {
-	return strings.TrimSpace(os.Getenv("KOSCHEI_TRON_FLOW_RADAR_ENABLED")) == "1"
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("KOSCHEI_TRON_FLOW_RADAR_ENABLED"))) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
 }
 
 func LoadTronFlowRadarConfigFromEnv() TronFlowRadarConfig {
@@ -193,79 +154,6 @@ func LoadTronFlowRadarConfigFromEnv() TronFlowRadarConfig {
 	}
 }
 
-type TronFlowTransfer struct {
-	TransactionID    string
-	BlockNumber      uint64
-	BlockTimestampMS int64
-	From             string // 41-hex
-	To               string // 41-hex
-	ValueRaw         *big.Int
-}
-
-// ParseTronBlockUSDTTransfers extracts successful USDT Transfer events from a
-// gettransactioninfobyblocknum response. Malformed entries are skipped.
-func ParseTronBlockUSDTTransfers(raw []byte) ([]TronFlowTransfer, error) {
-	var infos []struct {
-		ID          string `json:"id"`
-		BlockNumber uint64 `json:"blockNumber"`
-		Timestamp   int64  `json:"blockTimeStamp"`
-		Result      string `json:"result"`
-		Receipt     struct {
-			Result string `json:"result"`
-		} `json:"receipt"`
-		Log []struct {
-			Address string   `json:"address"`
-			Topics  []string `json:"topics"`
-			Data    string   `json:"data"`
-		} `json:"log"`
-	}
-	trimmed := bytes.TrimSpace(raw)
-	if len(trimmed) == 0 || string(trimmed) == "{}" {
-		return []TronFlowTransfer{}, nil // empty block
-	}
-	if err := json.Unmarshal(trimmed, &infos); err != nil {
-		return nil, errors.New("tron_block_info_invalid")
-	}
-	usdt, _ := tron.Address(tronFlowUSDTContract)
-	out := []TronFlowTransfer{}
-	for _, info := range infos {
-		if strings.EqualFold(info.Result, "FAILED") || (info.Receipt.Result != "" && info.Receipt.Result != "SUCCESS") {
-			continue
-		}
-		id, err := hex.DecodeString(info.ID)
-		if err != nil || len(id) != 32 {
-			continue
-		}
-		for _, entry := range info.Log {
-			if len(entry.Topics) != 3 || strings.ToLower(entry.Topics[0]) != tronFlowTransferTopic || "41"+strings.ToLower(entry.Address) != usdt {
-				continue
-			}
-			from, okFrom := tronFlowTopicAddress(entry.Topics[1])
-			to, okTo := tronFlowTopicAddress(entry.Topics[2])
-			data, err := hex.DecodeString(entry.Data)
-			if !okFrom || !okTo || err != nil || len(data) != 32 {
-				continue
-			}
-			out = append(out, TronFlowTransfer{
-				TransactionID: strings.ToLower(info.ID), BlockNumber: info.BlockNumber, BlockTimestampMS: info.Timestamp,
-				From: from, To: to, ValueRaw: new(big.Int).SetBytes(data),
-			})
-		}
-	}
-	return out, nil
-}
-
-func tronFlowTopicAddress(topic string) (string, bool) {
-	topic = strings.ToLower(topic)
-	if len(topic) != 64 || topic[:24] != strings.Repeat("0", 24) {
-		return "", false
-	}
-	if _, err := hex.DecodeString(topic[24:]); err != nil {
-		return "", false
-	}
-	return "41" + topic[24:], true
-}
-
 type TronFlowFinding struct {
 	Kind       string         `json:"kind"`
 	Severity   string         `json:"severity"`
@@ -279,8 +167,16 @@ type TronFlowFinding struct {
 
 type TronFlowSink func(context.Context, TronFlowFinding)
 
-// TronFreezeChecker returns frozen / not_frozen / unknown for an address.
-type TronFreezeChecker func(context.Context, string) string
+// TronHolderObservation is the current issuer freeze state and, when the
+// address is not frozen, its current USDT balance (nil when unreadable).
+type TronHolderObservation struct {
+	Freeze  string
+	Balance *big.Int
+}
+
+// TronHolderChecker reads a holder observation. It performs I/O and is always
+// called outside the radar state lock.
+type TronHolderChecker func(context.Context, string) TronHolderObservation
 
 type tronFlowNode struct {
 	hop          int
@@ -290,17 +186,32 @@ type tronFlowNode struct {
 	lastSeenMS   int64
 	outTimesMS   []int64
 	burstUntilMS int64
-	freezeDone   bool
+	holderDone   bool
 	freezeState  string
+	balanceRaw   *big.Int
+	lastCheck    time.Time
+	lastTransfer tron.BlockTransfer
 }
 
-// tronFlowState is the in-memory graph. It is not safe for concurrent use;
-// the radar loop owns it and Snapshot copies under the radar mutex.
+type tronFlowPendingCheck struct {
+	attempts int
+	next     time.Time
+}
+
+// tronFlowEffects are produced under the state lock without I/O and carried
+// out after it is released.
+type tronFlowEffects struct {
+	findings []TronFlowFinding
+	checks   []string // addresses needing a holder check
+}
+
+// tronFlowState is the in-memory graph. It performs no I/O and is guarded by
+// the radar mutex.
 type tronFlowState struct {
 	cfg        TronFlowRadarConfig
 	bridges    map[string]TronBridge
 	nodes      map[string]*tronFlowNode
-	freeze     TronFreezeChecker
+	pending    map[string]tronFlowPendingCheck
 	findings   []TronFlowFinding
 	hourStart  time.Time
 	hourCount  int
@@ -309,18 +220,40 @@ type tronFlowState struct {
 	now        func() time.Time
 }
 
-func newTronFlowState(cfg TronFlowRadarConfig, bridges map[string]TronBridge, freeze TronFreezeChecker) *tronFlowState {
-	s := &tronFlowState{cfg: cfg, bridges: bridges, nodes: map[string]*tronFlowNode{}, freeze: freeze, now: time.Now}
+func newTronFlowState(cfg TronFlowRadarConfig, bridges map[string]TronBridge) *tronFlowState {
+	s := &tronFlowState{cfg: cfg, bridges: bridges, nodes: map[string]*tronFlowNode{}, pending: map[string]tronFlowPendingCheck{}, now: time.Now}
 	s.setSeeds(cfg.Seeds)
 	return s
 }
 
-// setSeeds marks seed wallets as hop 0. A former seed stays followed as an
-// ordinary node and can be evicted.
+// setSeeds marks seed wallets as hop 0 and keeps the graph within MaxTracked.
+// Seeds take priority: when there are more seeds than the bound, only the
+// first MaxTracked are kept. A former seed stays followed as an ordinary node
+// and is evictable.
 func (s *tronFlowState) setSeeds(seeds []string) {
-	current := map[string]struct{}{}
+	unique := []string{}
+	seen := map[string]struct{}{}
 	for _, seed := range seeds {
+		if _, ok := seen[seed]; ok {
+			continue
+		}
+		seen[seed] = struct{}{}
+		unique = append(unique, seed)
+	}
+	if len(unique) > s.cfg.MaxTracked {
+		log.Printf("tron flow radar: %d seed(s) exceed max tracked %d; extra seeds ignored", len(unique)-s.cfg.MaxTracked, s.cfg.MaxTracked)
+		unique = unique[:s.cfg.MaxTracked]
+	}
+	current := map[string]struct{}{}
+	for _, seed := range unique {
 		current[seed] = struct{}{}
+	}
+	for address, node := range s.nodes {
+		if _, ok := current[address]; !ok && node.seed {
+			node.seed = false
+		}
+	}
+	for _, seed := range unique {
 		node := s.nodes[seed]
 		if node == nil {
 			node = &tronFlowNode{taintedRaw: new(big.Int)}
@@ -328,31 +261,40 @@ func (s *tronFlowState) setSeeds(seeds []string) {
 		}
 		node.hop, node.origin, node.seed = 0, seed, true
 	}
-	for address, node := range s.nodes {
-		if _, ok := current[address]; !ok && node.seed {
-			node.seed = false
+	s.enforceBound(0)
+}
+
+// enforceBound evicts least recently active non-seed nodes until there is
+// room for `room` more nodes within MaxTracked.
+func (s *tronFlowState) enforceBound(room int) {
+	for len(s.nodes)+room > s.cfg.MaxTracked {
+		oldest, oldestMS := "", int64(1<<62)
+		for address, node := range s.nodes {
+			if !node.seed && node.lastSeenMS < oldestMS {
+				oldest, oldestMS = address, node.lastSeenMS
+			}
 		}
+		if oldest == "" {
+			return // only seeds remain
+		}
+		delete(s.nodes, oldest)
+		delete(s.pending, oldest)
 	}
 }
 
 func tronFlowAmount(value *big.Int) string {
-	scale := new(big.Int).Exp(big.NewInt(10), big.NewInt(tronFlowUSDTDecimals), nil)
-	whole, fraction := new(big.Int).QuoRem(value, scale, new(big.Int))
-	frac := strings.TrimRight(fmt.Sprintf("%0*s", tronFlowUSDTDecimals, fraction.String()), "0")
-	if frac == "" {
-		return whole.String() + " USDT"
-	}
-	return whole.String() + "." + frac + " USDT"
+	return tron.FormatUnits(value, tron.USDTDecimals) + " USDT"
 }
 
 func tronFlowDisplay(hexAddress string) string {
-	if encoded := TronBase58(hexAddress); encoded != "" {
+	if encoded := tron.Base58(hexAddress); encoded != "" {
 		return encoded
 	}
 	return hexAddress
 }
 
-func (s *tronFlowState) emit(ctx context.Context, sink TronFlowSink, finding TronFlowFinding) {
+// admit applies the hourly cap and records an admitted finding. It does no I/O.
+func (s *tronFlowState) admit(finding TronFlowFinding) (TronFlowFinding, bool) {
 	now := s.now()
 	if now.Sub(s.hourStart) >= time.Hour {
 		if s.suppressed > 0 {
@@ -362,7 +304,7 @@ func (s *tronFlowState) emit(ctx context.Context, sink TronFlowSink, finding Tro
 	}
 	if s.hourCount >= s.cfg.MaxFindings {
 		s.suppressed++
-		return
+		return finding, false
 	}
 	s.hourCount++
 	finding.ObservedAt = now.UTC()
@@ -377,43 +319,43 @@ func (s *tronFlowState) emit(ctx context.Context, sink TronFlowSink, finding Tro
 	if len(s.findings) > tronFlowRecentFindings {
 		s.findings = s.findings[len(s.findings)-tronFlowRecentFindings:]
 	}
-	log.Printf("tron flow radar finding kind=%s severity=%s address=%s", finding.Kind, finding.Severity, finding.Address)
-	if sink != nil {
-		sink(ctx, finding)
-	}
+	return finding, true
 }
 
-func tronFlowTransferEvidence(t TronFlowTransfer) map[string]any {
+func tronFlowTransferEvidence(t tron.BlockTransfer) map[string]any {
 	return map[string]any{
-		"transaction_id": t.TransactionID, "block_number": t.BlockNumber, "block_timestamp_ms": t.BlockTimestampMS,
-		"from": tronFlowDisplay(t.From), "to": tronFlowDisplay(t.To), "value_raw": t.ValueRaw.String(), "amount": tronFlowAmount(t.ValueRaw),
-		"token_contract": tronFlowUSDTContract,
+		"transaction_id": t.TransactionID, "event_index": t.EventIndex, "block_number": t.BlockNumber, "block_timestamp_ms": t.BlockTimestampMS,
+		"from": tronFlowDisplay(t.From), "to": tronFlowDisplay(t.To), "value_raw": t.Value.String(), "amount": tronFlowAmount(t.Value),
+		"token_contract": tron.USDTContract,
 	}
 }
 
-func (s *tronFlowState) process(ctx context.Context, sink TronFlowSink, t TronFlowTransfer) {
+// process updates the in-memory graph for one transfer. It performs no I/O;
+// findings and holder checks are returned for the caller to carry out.
+func (s *tronFlowState) process(t tron.BlockTransfer) tronFlowEffects {
 	s.transfers++
+	effects := tronFlowEffects{}
 	bridge, toBridge := s.bridges[t.To]
 	source := s.nodes[t.From]
 
 	if source == nil {
 		// Network-wide signal: a very large USDT deposit into a pinned bridge,
 		// even when it does not descend from a seed.
-		if toBridge && t.ValueRaw.Cmp(s.cfg.BridgeAlertRaw) >= 0 {
+		if toBridge && t.Value.Cmp(s.cfg.BridgeAlertRaw) >= 0 {
 			evidence := tronFlowTransferEvidence(t)
 			evidence["bridge_label"], evidence["bridge_source"] = bridge.Label, bridge.Source
 			evidence["response_options"] = []string{"bridge_operator_notice:" + bridge.Label}
-			s.emit(ctx, sink, TronFlowFinding{
+			effects.findings = append(effects.findings, TronFlowFinding{
 				Kind: "tron_large_bridge_inflow", Severity: "info", Address: tronFlowDisplay(t.From),
 				Title:     "Large USDT deposit into a pinned bridge",
-				Message:   fmt.Sprintf("%s moved from %s into %s. Not linked to a seed wallet.", tronFlowAmount(t.ValueRaw), tronFlowDisplay(t.From), bridge.Label),
-				DedupeKey: "tron-flow:bridge-inflow:" + t.TransactionID, Evidence: evidence,
+				Message:   fmt.Sprintf("%s moved from %s into %s. Not linked to a seed wallet.", tronFlowAmount(t.Value), tronFlowDisplay(t.From), bridge.Label),
+				DedupeKey: "tron-flow:bridge-inflow:" + t.EventID(), Evidence: evidence,
 			})
 		}
-		return
+		return effects
 	}
-	if t.ValueRaw.Cmp(s.cfg.MinFollowRaw) < 0 {
-		return
+	if t.Value.Cmp(s.cfg.MinFollowRaw) < 0 {
+		return effects
 	}
 	source.lastSeenMS = t.BlockTimestampMS
 	responseOptions := []string{"issuer_freeze_request:tether_usdt", "receiving_party_notice"}
@@ -428,14 +370,13 @@ func (s *tronFlowState) process(ctx context.Context, sink TronFlowSink, t TronFl
 	if source.seed && len(kept) == 0 {
 		evidence := tronFlowTransferEvidence(t)
 		evidence["response_options"] = responseOptions
-		s.emit(ctx, sink, TronFlowFinding{
+		effects.findings = append(effects.findings, TronFlowFinding{
 			Kind: "tron_flow_seed_outflow", Severity: "high", Address: tronFlowDisplay(t.From),
 			Title:     "Seed wallet started moving USDT",
-			Message:   fmt.Sprintf("%s sent %s to %s. Every recipient is now followed up to %d hops across the network.", tronFlowDisplay(t.From), tronFlowAmount(t.ValueRaw), tronFlowDisplay(t.To), s.cfg.MaxHops),
+			Message:   fmt.Sprintf("%s sent %s to %s. Every recipient is now followed up to %d hops across the network.", tronFlowDisplay(t.From), tronFlowAmount(t.Value), tronFlowDisplay(t.To), s.cfg.MaxHops),
 			DedupeKey: "tron-flow:seed-outflow:" + t.From, Evidence: evidence,
 		})
 	}
-
 	source.outTimesMS = append(kept, t.BlockTimestampMS)
 	if len(source.outTimesMS) >= s.cfg.BurstCount && t.BlockTimestampMS >= source.burstUntilMS {
 		source.burstUntilMS = t.BlockTimestampMS + s.cfg.BurstWindow.Milliseconds()
@@ -443,7 +384,7 @@ func (s *tronFlowState) process(ctx context.Context, sink TronFlowSink, t TronFl
 		evidence["hop"], evidence["origin_seed"] = source.hop, tronFlowDisplay(source.origin)
 		evidence["transfers_in_window"], evidence["window_seconds"] = len(source.outTimesMS), int(s.cfg.BurstWindow.Seconds())
 		evidence["response_options"] = responseOptions
-		s.emit(ctx, sink, TronFlowFinding{
+		effects.findings = append(effects.findings, TronFlowFinding{
 			Kind: "tron_flow_fan_out", Severity: "high", Address: tronFlowDisplay(t.From),
 			Title:     "Scripted fan-out from a followed wallet",
 			Message:   fmt.Sprintf("%s (hop %d from %s) sent %d USDT transfers of at least the follow threshold within %s.", tronFlowDisplay(t.From), source.hop, tronFlowDisplay(source.origin), len(source.outTimesMS), s.cfg.BurstWindow),
@@ -456,64 +397,104 @@ func (s *tronFlowState) process(ctx context.Context, sink TronFlowSink, t TronFl
 		evidence["hop"], evidence["origin_seed"] = source.hop, tronFlowDisplay(source.origin)
 		evidence["bridge_label"], evidence["bridge_source"] = bridge.Label, bridge.Source
 		evidence["response_options"] = []string{"bridge_operator_notice:" + bridge.Label, "issuer_freeze_request:tether_usdt"}
-		s.emit(ctx, sink, TronFlowFinding{
+		effects.findings = append(effects.findings, TronFlowFinding{
 			Kind: "tron_flow_bridge_exit", Severity: "critical", Address: tronFlowDisplay(t.From),
 			Title:     "Followed funds entered a bridge",
-			Message:   fmt.Sprintf("%s from %s (hop %d from seed %s) entered %s and may leave Tron. Koschei cannot reverse it; send the transaction ID to %s now.", tronFlowAmount(t.ValueRaw), tronFlowDisplay(t.From), source.hop, tronFlowDisplay(source.origin), bridge.Label, bridge.Label),
-			DedupeKey: "tron-flow:bridge-exit:" + t.TransactionID, Evidence: evidence,
+			Message:   fmt.Sprintf("%s from %s (hop %d from seed %s) entered %s and may leave Tron. Koschei cannot reverse it; send the transaction ID to %s now.", tronFlowAmount(t.Value), tronFlowDisplay(t.From), source.hop, tronFlowDisplay(source.origin), bridge.Label, bridge.Label),
+			DedupeKey: "tron-flow:bridge-exit:" + t.EventID(), Evidence: evidence,
 		})
-		return
+		return effects
 	}
 	if source.hop >= s.cfg.MaxHops {
-		return
+		return effects
 	}
 	target := s.nodes[t.To]
 	if target == nil {
-		s.evictIfFull()
+		s.enforceBound(1)
 		target = &tronFlowNode{hop: source.hop + 1, origin: source.origin, taintedRaw: new(big.Int)}
 		s.nodes[t.To] = target
 	} else if !target.seed && source.hop+1 < target.hop {
 		target.hop, target.origin = source.hop+1, source.origin
 	}
 	target.lastSeenMS = t.BlockTimestampMS
-	target.taintedRaw.Add(target.taintedRaw, t.ValueRaw)
-	if !target.seed && !target.freezeDone && target.taintedRaw.Cmp(s.cfg.FreezeCheckRaw) >= 0 && s.freeze != nil {
-		state := s.freeze(ctx, t.To)
-		target.freezeState = state
-		if state == "frozen" || state == "not_frozen" {
-			target.freezeDone = true
-		}
-		if state == "not_frozen" {
-			evidence := tronFlowTransferEvidence(t)
-			evidence["hop"], evidence["origin_seed"] = target.hop, tronFlowDisplay(target.origin)
-			evidence["followed_received_raw"], evidence["followed_received"] = target.taintedRaw.String(), tronFlowAmount(target.taintedRaw)
-			evidence["usdt_freeze_state"] = state
-			evidence["response_options"] = []string{"issuer_freeze_request:tether_usdt"}
-			s.emit(ctx, sink, TronFlowFinding{
-				Kind: "tron_flow_freeze_candidate", Severity: "high", Address: tronFlowDisplay(t.To),
-				Title:     "Unfrozen address holds followed USDT",
-				Message:   fmt.Sprintf("%s has received %s descending from seed %s (hop %d) and Tether has not frozen it. Only Tether can freeze it; report the address and transaction IDs to Tether and law enforcement now.", tronFlowDisplay(t.To), tronFlowAmount(target.taintedRaw), tronFlowDisplay(target.origin), target.hop),
-				DedupeKey: "tron-flow:freeze-candidate:" + t.To, Evidence: evidence,
-			})
+	target.lastTransfer = t
+	target.taintedRaw.Add(target.taintedRaw, t.Value)
+	if !target.seed && !target.holderDone && target.taintedRaw.Cmp(s.cfg.FreezeCheckRaw) >= 0 &&
+		(target.lastCheck.IsZero() || s.now().Sub(target.lastCheck) >= tronFlowRecheckInterval) {
+		if _, queued := s.pending[t.To]; !queued {
+			effects.checks = append(effects.checks, t.To)
 		}
 	}
+	return effects
 }
 
-// evictIfFull drops the least recently active non-seed node when the
-// in-memory graph is at its bound.
-func (s *tronFlowState) evictIfFull() {
-	if len(s.nodes) < s.cfg.MaxTracked {
-		return
+// applyHolderCheck records a holder observation. A finding is produced only
+// when the issuer has not frozen the address and its current USDT balance is
+// at least the freeze-check threshold. Unreadable states are retried with
+// backoff, independent of new receipts, up to a bounded number of attempts.
+func (s *tronFlowState) applyHolderCheck(address string, observed TronHolderObservation) tronFlowEffects {
+	effects := tronFlowEffects{}
+	node := s.nodes[address]
+	if node == nil || node.seed {
+		delete(s.pending, address)
+		return effects
 	}
-	oldest, oldestMS := "", int64(1<<62)
-	for address, node := range s.nodes {
-		if !node.seed && node.lastSeenMS < oldestMS {
-			oldest, oldestMS = address, node.lastSeenMS
+	node.freezeState = observed.Freeze
+	readable := observed.Freeze == tron.FreezeFrozen || (observed.Freeze == tron.FreezeClear && observed.Balance != nil)
+	if !readable {
+		retry := s.pending[address]
+		retry.attempts++
+		if retry.attempts >= tronFlowMaxCheckTries {
+			delete(s.pending, address)
+			return effects
+		}
+		retry.next = s.now().Add(tronFlowCheckBaseDelay << (retry.attempts - 1))
+		s.pending[address] = retry
+		return effects
+	}
+	delete(s.pending, address)
+	node.lastCheck = s.now()
+	node.balanceRaw = observed.Balance
+	if observed.Freeze == tron.FreezeFrozen {
+		node.holderDone = true
+		return effects
+	}
+	if observed.Balance.Cmp(s.cfg.FreezeCheckRaw) < 0 {
+		// Funds already moved on; a later qualifying receipt re-checks.
+		return effects
+	}
+	node.holderDone = true
+	evidence := tronFlowTransferEvidence(node.lastTransfer)
+	evidence["hop"], evidence["origin_seed"] = node.hop, tronFlowDisplay(node.origin)
+	evidence["followed_received_raw"], evidence["followed_received"] = node.taintedRaw.String(), tronFlowAmount(node.taintedRaw)
+	evidence["current_usdt_balance_raw"], evidence["current_usdt_balance"] = observed.Balance.String(), tronFlowAmount(observed.Balance)
+	evidence["balance_source"] = "TRC-20 USDT balanceOf(address) constant call at the node's latest state"
+	evidence["usdt_freeze_state"] = observed.Freeze
+	evidence["response_options"] = []string{"issuer_freeze_request:tether_usdt"}
+	effects.findings = append(effects.findings, TronFlowFinding{
+		Kind: "tron_flow_freeze_candidate", Severity: "high", Address: tronFlowDisplay(address),
+		Title: "Unfrozen address holds USDT after receiving followed funds",
+		Message: fmt.Sprintf("%s received %s descending from seed %s (hop %d) and currently holds %s USDT. Tether has not frozen it. Only Tether can freeze it; report the address and transaction IDs to Tether and law enforcement now.",
+			tronFlowDisplay(address), tronFlowAmount(node.taintedRaw), tronFlowDisplay(node.origin), node.hop, tron.FormatUnits(observed.Balance, tron.USDTDecimals)),
+		DedupeKey: "tron-flow:freeze-candidate:" + address, Evidence: evidence,
+	})
+	return effects
+}
+
+// dueChecks returns up to limit queued holder checks whose retry time passed.
+func (s *tronFlowState) dueChecks(limit int) []string {
+	now := s.now()
+	due := []string{}
+	for address, retry := range s.pending {
+		if !retry.next.After(now) {
+			due = append(due, address)
 		}
 	}
-	if oldest != "" {
-		delete(s.nodes, oldest)
+	sort.Strings(due)
+	if len(due) > limit {
+		due = due[:limit]
 	}
+	return due
 }
 
 type TronFlowFollowedAddress struct {
@@ -523,6 +504,7 @@ type TronFlowFollowedAddress struct {
 	Seed            bool   `json:"seed"`
 	ReceivedRaw     string `json:"followed_received_raw"`
 	Received        string `json:"followed_received"`
+	CurrentBalance  string `json:"current_usdt_balance,omitempty"`
 	LastActivityMS  int64  `json:"last_activity_block_timestamp_ms"`
 	USDTFreezeState string `json:"usdt_freeze_state"`
 }
@@ -539,32 +521,40 @@ type TronFlowRadarSettings struct {
 	MaxFindingsPerHour int    `json:"max_findings_per_hour"`
 }
 
-const tronFlowTopFollowed = 25
-
 // topFollowed lists seeds first, then followed addresses holding the most
 // followed USDT.
 func (s *tronFlowState) topFollowed(limit int) []TronFlowFollowedAddress {
-	out := make([]TronFlowFollowedAddress, 0, len(s.nodes))
+	type ranked struct {
+		row      TronFlowFollowedAddress
+		received *big.Int
+	}
+	all := make([]ranked, 0, len(s.nodes))
 	for address, node := range s.nodes {
-		out = append(out, TronFlowFollowedAddress{
+		row := TronFlowFollowedAddress{
 			Address: tronFlowDisplay(address), Hop: node.hop, OriginSeed: tronFlowDisplay(node.origin), Seed: node.seed,
 			ReceivedRaw: node.taintedRaw.String(), Received: tronFlowAmount(node.taintedRaw), LastActivityMS: node.lastSeenMS,
 			USDTFreezeState: firstNonEmptyString(node.freezeState, "not_checked"),
-		})
-	}
-	sort.SliceStable(out, func(i, j int) bool {
-		if out[i].Seed != out[j].Seed {
-			return out[i].Seed
 		}
-		left, _ := new(big.Int).SetString(out[i].ReceivedRaw, 10)
-		right, _ := new(big.Int).SetString(out[j].ReceivedRaw, 10)
-		if cmp := left.Cmp(right); cmp != 0 {
+		if node.balanceRaw != nil {
+			row.CurrentBalance = tronFlowAmount(node.balanceRaw)
+		}
+		all = append(all, ranked{row: row, received: node.taintedRaw})
+	}
+	sort.SliceStable(all, func(i, j int) bool {
+		if all[i].row.Seed != all[j].row.Seed {
+			return all[i].row.Seed
+		}
+		if cmp := all[i].received.Cmp(all[j].received); cmp != 0 {
 			return cmp > 0
 		}
-		return out[i].Address < out[j].Address
+		return all[i].row.Address < all[j].row.Address
 	})
-	if len(out) > limit {
-		out = out[:limit]
+	if len(all) > limit {
+		all = all[:limit]
+	}
+	out := make([]TronFlowFollowedAddress, 0, len(all))
+	for _, item := range all {
+		out = append(out, item.row)
 	}
 	return out
 }
@@ -575,6 +565,7 @@ type TronFlowRadarSnapshot struct {
 	Head           uint64                    `json:"head,string"`
 	Seeds          int                       `json:"seeds"`
 	Followed       int                       `json:"followed_addresses"`
+	PendingChecks  int                       `json:"pending_holder_checks"`
 	Transfers      uint64                    `json:"usdt_transfers_processed,string"`
 	Suppressed     int                       `json:"findings_suppressed_this_hour"`
 	RecentFindings []TronFlowFinding         `json:"recent_findings"`
@@ -585,9 +576,13 @@ type TronFlowRadarSnapshot struct {
 	Storage        string                    `json:"storage"`
 }
 
+// TronFlowRadar owns the loop. mu guards state and progress only; provider
+// requests and the alert sink always run without holding it, so Snapshot
+// stays responsive during provider degradation.
 type TronFlowRadar struct {
 	cfg    TronFlowRadarConfig
-	client *http.Client
+	grid   tron.GridClient
+	holder TronHolderChecker
 	sink   TronFlowSink
 	health *runtimehealth.Registry
 	db     *sql.DB
@@ -609,9 +604,23 @@ func ActiveTronFlowRadar() *TronFlowRadar { return activeTronFlowRadar.Load() }
 
 func NewTronFlowRadar(cfg TronFlowRadarConfig, db *sql.DB, sink TronFlowSink, health *runtimehealth.Registry) *TronFlowRadar {
 	r := &TronFlowRadar{cfg: cfg, sink: sink, health: health, db: db,
-		client: &http.Client{Timeout: 15 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}
-	r.state = newTronFlowState(cfg, TronPinnedBridges(), r.usdtFreezeState)
+		grid: tron.GridClient{BaseURL: cfg.Endpoint, APIKey: cfg.APIKey,
+			HTTP: &http.Client{Timeout: 15 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}}
+	r.holder = r.gridHolderObservation
+	r.state = newTronFlowState(cfg, TronPinnedBridges())
 	return r
+}
+
+func (r *TronFlowRadar) gridHolderObservation(ctx context.Context, address string) TronHolderObservation {
+	callCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
+	defer cancel()
+	observed := TronHolderObservation{Freeze: r.grid.USDTFreezeState(callCtx, address)}
+	if observed.Freeze == tron.FreezeClear {
+		if balance, err := r.grid.USDTBalance(callCtx, address); err == nil {
+			observed.Balance = balance
+		}
+	}
+	return observed
 }
 
 func (r *TronFlowRadar) Snapshot() TronFlowRadarSnapshot {
@@ -626,7 +635,7 @@ func (r *TronFlowRadar) Snapshot() TronFlowRadarSnapshot {
 	findings := append([]TronFlowFinding(nil), r.state.findings...)
 	sort.SliceStable(findings, func(i, j int) bool { return findings[i].ObservedAt.After(findings[j].ObservedAt) })
 	snapshot := TronFlowRadarSnapshot{Running: r.running, Cursor: r.cursor, Head: r.head, Seeds: seeds, Followed: len(r.state.nodes),
-		Transfers: r.state.transfers, Suppressed: r.state.suppressed, RecentFindings: findings,
+		PendingChecks: len(r.state.pending), Transfers: r.state.transfers, Suppressed: r.state.suppressed, RecentFindings: findings,
 		TopFollowed: r.state.topFollowed(tronFlowTopFollowed), LastError: r.lastError, Storage: "in_memory_only",
 		Settings: TronFlowRadarSettings{
 			MinFollow: tronFlowAmount(r.cfg.MinFollowRaw), MaxHops: r.cfg.MaxHops, BurstCount: r.cfg.BurstCount,
@@ -642,68 +651,76 @@ func (r *TronFlowRadar) Snapshot() TronFlowRadarSnapshot {
 	return snapshot
 }
 
-// post never returns the URL, API key or upstream body in errors.
-func (r *TronFlowRadar) post(ctx context.Context, path string, body any, limit int64) ([]byte, error) {
-	encoded, err := json.Marshal(body)
-	if err != nil {
-		return nil, errors.New("tron_request_encoding_failed")
+// deliver admits findings under the lock, then sends them without it.
+func (r *TronFlowRadar) deliver(ctx context.Context, findings []TronFlowFinding) {
+	if len(findings) == 0 {
+		return
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(r.cfg.Endpoint, "/")+path, bytes.NewReader(encoded))
-	if err != nil {
-		return nil, errors.New("tron_request_invalid")
+	admitted := []TronFlowFinding{}
+	r.mu.Lock()
+	for _, finding := range findings {
+		if accepted, ok := r.state.admit(finding); ok {
+			admitted = append(admitted, accepted)
+		}
 	}
-	req.Header.Set("Content-Type", "application/json")
-	if r.cfg.APIKey != "" {
-		req.Header.Set("TRON-PRO-API-KEY", r.cfg.APIKey)
+	r.mu.Unlock()
+	for _, finding := range admitted {
+		log.Printf("tron flow radar finding kind=%s severity=%s address=%s", finding.Kind, finding.Severity, finding.Address)
+		if r.sink != nil {
+			r.sink(ctx, finding)
+		}
 	}
-	res, err := r.client.Do(req)
-	if err != nil {
-		return nil, errors.New("tron_provider_unavailable")
-	}
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("tron_provider_http_%d", res.StatusCode)
-	}
-	raw, err := io.ReadAll(io.LimitReader(res.Body, limit+1))
-	if err != nil || int64(len(raw)) > limit {
-		return nil, errors.New("tron_provider_response_too_large")
-	}
-	return raw, nil
 }
 
-func (r *TronFlowRadar) solidHead(ctx context.Context) (uint64, error) {
-	raw, err := r.post(ctx, "/walletsolidity/getnowblock", map[string]any{}, tronFlowMaxHeadBytes)
-	if err != nil {
-		return 0, err
+// runHolderChecks performs holder reads without the lock and applies each
+// result under a short lock section.
+func (r *TronFlowRadar) runHolderChecks(ctx context.Context, addresses []string) {
+	seen := map[string]struct{}{}
+	for _, address := range addresses {
+		if _, ok := seen[address]; ok || ctx.Err() != nil {
+			continue
+		}
+		seen[address] = struct{}{}
+		observed := r.holder(ctx, address)
+		r.mu.Lock()
+		effects := r.state.applyHolderCheck(address, observed)
+		r.mu.Unlock()
+		r.deliver(ctx, effects.findings)
 	}
-	var block struct {
-		Header struct {
-			Raw struct {
-				Number uint64 `json:"number"`
-			} `json:"raw_data"`
-		} `json:"block_header"`
-	}
-	if json.Unmarshal(raw, &block) != nil || block.Header.Raw.Number == 0 {
-		return 0, errors.New("tron_head_invalid")
-	}
-	return block.Header.Raw.Number, nil
 }
 
-func (r *TronFlowRadar) usdtFreezeState(ctx context.Context, hexAddress string) string {
-	contract, err := tron.Address(tronFlowUSDTContract)
-	if err != nil || len(hexAddress) != 42 {
-		return "unknown"
+// ingest applies a block's transfers to the graph, then carries out the
+// resulting deliveries and holder checks outside the lock.
+func (r *TronFlowRadar) ingest(ctx context.Context, transfers []tron.BlockTransfer) {
+	all := tronFlowEffects{}
+	r.mu.Lock()
+	for _, transfer := range transfers {
+		effects := r.state.process(transfer)
+		all.findings = append(all.findings, effects.findings...)
+		all.checks = append(all.checks, effects.checks...)
 	}
-	callCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
-	defer cancel()
-	raw, err := r.post(callCtx, "/wallet/triggerconstantcontract", map[string]any{
-		"owner_address": hexAddress, "contract_address": contract, "function_selector": "isBlackListed(address)",
-		"parameter": strings.Repeat("0", 24) + hexAddress[2:], "visible": false,
-	}, tronFlowMaxHeadBytes)
-	if err != nil {
-		return "unknown"
+	r.mu.Unlock()
+	r.deliver(ctx, all.findings)
+	if len(all.checks) > tronFlowMaxHolderChecks {
+		// Defer the overflow to the retry queue instead of stalling the block loop.
+		r.mu.Lock()
+		for _, address := range all.checks[tronFlowMaxHolderChecks:] {
+			if _, queued := r.state.pending[address]; !queued {
+				r.state.pending[address] = tronFlowPendingCheck{next: r.state.now()}
+			}
+		}
+		r.mu.Unlock()
+		all.checks = all.checks[:tronFlowMaxHolderChecks]
 	}
-	return ParseTronUSDTFreezeWord(raw)
+	r.runHolderChecks(ctx, all.checks)
+}
+
+// retryPendingChecks runs due queued holder checks, bounded per cycle.
+func (r *TronFlowRadar) retryPendingChecks(ctx context.Context) {
+	r.mu.Lock()
+	due := r.state.dueChecks(tronFlowMaxHolderChecks)
+	r.mu.Unlock()
+	r.runHolderChecks(ctx, due)
 }
 
 func (r *TronFlowRadar) refreshSeeds(ctx context.Context) {
@@ -731,9 +748,9 @@ func (r *TronFlowRadar) refreshSeeds(ctx context.Context) {
 }
 
 // cycle processes solidified blocks from the cursor toward the head, bounded
-// per cycle. It returns the number of blocks processed.
+// per cycle, then retries due holder checks. It returns blocks processed.
 func (r *TronFlowRadar) cycle(ctx context.Context) (int, error) {
-	head, err := r.solidHead(ctx)
+	head, err := r.grid.SolidHead(ctx)
 	if err != nil {
 		return 0, err
 	}
@@ -752,27 +769,22 @@ func (r *TronFlowRadar) cycle(ctx context.Context) (int, error) {
 	processed := 0
 	for cursor < head && processed < r.cfg.MaxBlocks && ctx.Err() == nil {
 		next := cursor + 1
-		raw, err := r.post(ctx, "/walletsolidity/gettransactioninfobyblocknum", map[string]any{"num": next}, tronFlowMaxBlockBytes)
+		transfers, err := r.grid.SolidBlockUSDTTransfers(ctx, next)
 		if err != nil {
 			return processed, err
 		}
-		transfers, err := ParseTronBlockUSDTTransfers(raw)
-		if err != nil {
-			return processed, err
-		}
+		r.ingest(ctx, transfers)
 		r.mu.Lock()
-		for _, transfer := range transfers {
-			r.state.process(ctx, r.sink, transfer)
-		}
 		r.cursor = next
 		r.mu.Unlock()
 		cursor = next
 		processed++
 	}
+	r.retryPendingChecks(ctx)
 	return processed, nil
 }
 
-// Start runs the radar until ctx ends. It is a no-op unless enabled and keyed.
+// Start runs the radar until ctx ends.
 func (r *TronFlowRadar) Start(ctx context.Context) func() {
 	if r.health != nil {
 		r.health.Register(TronFlowRadarHealthID, "worker", "tron-mainnet", true)
