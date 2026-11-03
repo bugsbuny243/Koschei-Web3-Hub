@@ -506,6 +506,36 @@ function install(){
 
   // The canonical customer job endpoint is already account-scoped and durable.
   // Never route this through owner APIs or claim non-Solana collectors exist.
+  // One tap turns a scanned target into continuous monitoring on the
+  // customer's watchlist: an EVM wallet is re-read every minute for EIP-7702
+  // delegation, a Solana token hourly for authority, supply and holder changes.
+  let watchNode=null;
+  function attachWatch(){if(watchNode&&!recovery.contains?.(watchNode)){recovery.append(watchNode);recovery.hidden=false;}}
+  function makeWatchButton(request,kind){
+    const button=document.createElement('button');
+    button.type='button';
+    button.textContent=kind==='wallet'?'Watch this wallet live (alerts on new EIP-7702 delegation)':'Watch this token (alerts on authority, supply and holder changes)';
+    button.addEventListener('click',async()=>{
+      if(button.disabled)return;button.disabled=true;
+      try{
+        await window.KoscheiAuth?.init?.();
+        if(!window.KoscheiAuth?.isLoggedIn?.()){status.textContent='Sign in to monitor this target.';button.disabled=false;return;}
+        const response=await window.KoscheiAuth.apiCall('/api/watchlist',{method:'POST',credentials:'same-origin',cache:'no-store',
+          headers:{'Content-Type':'application/json','Accept':'application/json'},
+          body:JSON.stringify({target:request.target,target_type:kind,network:request.network,label:request.target.slice(0,10)+'…'})});
+        const data=await response?.json?.().catch(()=>({}));
+        if(response?.ok&&data?.created===true){
+          button.textContent='Monitoring on — alerts appear in your Watchlist';
+          status.textContent=kind==='wallet'?'This wallet is now checked every minute. A new or changed EIP-7702 delegation raises a critical alert.':'This token is now monitored. Authority, supply and holder-concentration changes raise alerts.';
+          return;
+        }
+        status.textContent=response?.status===503?'Live monitoring for this network is not configured yet.':[402,403].includes(response?.status)?'An active Professional account is required for live monitoring.':response?.status===409?'Your watchlist is full.':'Monitoring could not be started. Try again.';
+      }catch{status.textContent='Monitoring could not be started. Try again.';}
+      button.disabled=false;
+    });
+    return button;
+  }
+
   // The account's newest retained job for this target, or null. Any failure
   // (signed out, no Professional access, network) means "nothing to reuse".
   async function latestRetainedJob(request,signal){
@@ -596,7 +626,7 @@ function install(){
         historyLink.href='/reports?job='+encodeURIComponent(id);
         historyLink.textContent='View retained result in account history';
         recovery.replaceChildren(button,historyLink);
-        recovery.hidden=false;
+        recovery.hidden=false;attachWatch();
         // The address pre-check stays available but folds away behind the
         // investigation, which is what the customer asked for.
         const initialHTML=nativeOnly?results.innerHTML:
@@ -615,6 +645,7 @@ function install(){
             (readable?readableArvisReportHTML(report):report?fullEvidencePanel('Complete retained ARVIS report',report):'')+
             '</section>';
           if(readable)bindTechnicalEvidence(results,report);
+          if(readable&&request.family==='solana'&&Array.isArray(report.modules)&&!watchNode){watchNode=makeWatchButton(request,'token');attachWatch();}
         };
         const retainedNote=retainedAt?`Showing your retained report from ${retainedAt}; no output was used. "Run a fresh investigation" starts a new one (1 output).`:'';
         show(retainedAt?'Loading your retained report…':'Queued. The investigation continues on the server and remains in your account history.');
@@ -669,7 +700,8 @@ function install(){
     const chat=document.createElement('a');
     chat.href='/arvis-chat?'+new URLSearchParams({target:request.target,network:request.network});
     chat.textContent='Explore evidence with ARVIS';
-    recovery.replaceChildren(button,chat);recovery.hidden=false;
+    if(request.family==='evm'&&request.kind==='address')watchNode=makeWatchButton(request,'wallet');
+    recovery.replaceChildren(button,chat);recovery.hidden=false;attachWatch();
     if(auto)start({fresh:false});
     else if(resume&&!nativeOnly)start({fresh:false,reuseOnly:true});
   }
@@ -678,7 +710,7 @@ function install(){
   // shared or bookmarked result link runs the free pre-check only.
   async function runScan(explicit=false){
     if(!active())return;
-    stop();wrap.hidden=true;recovery.hidden=true;
+    stop();wrap.hidden=true;recovery.hidden=true;watchNode=null;
     const request=routing.resolve(input.value,network.value);
     if(request.error){
       status.textContent=request.error;input.setAttribute('aria-invalid','true');
