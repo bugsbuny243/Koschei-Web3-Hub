@@ -80,6 +80,7 @@ Yalnızca yapılandırılmış kanallara kuyruk açılır; hiçbiri yoksa alarml
 |---|---|
 | `KOSCHEI_AUTOMATIC_SCANNING_ENABLED` | Arka plan taramalarının ana anahtarı (watchlist monitor bunu da ister). |
 | `WATCHLIST_MONITOR_ENABLED`, `WATCHLIST_MONITOR_INTERVAL`, `WATCHLIST_MONITOR_BATCH_SIZE` | Watchlist izleme. |
+| `WATCHLIST_TRON_INTERVAL` (≥15s, varsayılan 1m), `WATCHLIST_TRON_BRIDGE_ADDRESSES_JSON` | Tron cüzdan izleme: yeni TRX/TRC-20 çıkışları, ani çıkış dalgası ve USDT dondurma değişikliği alarmı. `TRONGRID_API_KEY` gerekir. Köprü listesi yalnızca kaynaklı (HTTPS) adresleri kabul eder; adres uydurulmaz. |
 | `KOSCHEI_SOLANA_AUTHORITY_WATCH_ENABLED` / `_ADDRESSES` (1–3 hesap) / `_INTERVAL_SECONDS` (60–900) | SOC PB02 sınırlı authority izleme. |
 | `KOSCHEI_SOC_REVIEW_POLICY_JSON` | Opsiyonel inceleme politikası. |
 | `ARVIS_STREAM_CANONICAL_JOBS_ENABLED` + `KOSCHEI_ARVIS_STREAM_TRUSTED_VERDICT_KEYS_JSON` | Stream tabanlı imzalı final kararlar; ayrıca `SOLANA_RPC_URL` gerekir. |
