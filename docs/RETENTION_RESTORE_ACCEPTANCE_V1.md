@@ -224,6 +224,10 @@ Before returning **any** match, the tool requires:
   independent provenance;
 - a PostgreSQL connection used only for canonical JSONB SHA-256 verification
   of **every row in the object**, including rows outside the requested filter;
+- source identity parity for **every row**: each row's declared `source_id`
+  must match the current managed table's ID column in its JSON payload.
+  A forged nonmatching row rejects the entire lookup, even when its payload
+  checksum is mathematically correct;
 - one known retention-managed `source_table`, plus either an exact
   `source_id` or an archive timestamp bound;
 - a maximum of 100 result entries (default 25), reporting `truncated`
@@ -256,8 +260,9 @@ objects. No file, bucket, or production database is changed by the tool.
 
 A PostgreSQL 17 acceptance test checks authorized matching metadata,
 archive-time filtering, bounded results, absence of payload leakage, missing
-or forged object digest, unrecognized table, unbounded queries and rejection
-of a corrupt **nonmatching** row. CI also asserts that the CLI refuses a
+or forged object digest, unrecognized table, unbounded queries, a corrupt
+**nonmatching** row, and a deliberately forged source identity whose payload
+checksum is otherwise valid. CI also asserts that the CLI refuses a
 missing trusted object SHA before opening any object or connecting to a DB.
 
 **Future, separately reviewed work:** owner-scoped authorization and audit
