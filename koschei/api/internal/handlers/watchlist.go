@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"koschei/api/internal/networktarget"
+	"koschei/api/internal/radaradapter/tron"
 	"koschei/api/internal/web3"
 )
 
@@ -75,6 +76,12 @@ type watchlistTokenSnapshot struct {
 	// holds the last successful observation, not the current state.
 	EVMProbeStatus   string `json:"evm_probe_status,omitempty"`
 	EVMProbeFailedAt string `json:"evm_probe_failed_at,omitempty"`
+	// Set only for Tron wallets watched for outbound transfers and USDT freeze state.
+	TronWallet *watchlistTronWalletSnapshot `json:"tron_wallet,omitempty"`
+	// "unavailable" while the latest Tron probe failed; tron_wallet then holds
+	// the last successful observation, not the current state.
+	TronProbeStatus   string `json:"tron_probe_status,omitempty"`
+	TronProbeFailedAt string `json:"tron_probe_failed_at,omitempty"`
 }
 
 type watchlistAlertCandidate struct {
@@ -292,6 +299,18 @@ func (h *Handler) createWatchlistTarget(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 	case "wallet":
+		if watchlistTronWalletNetwork(req.Network) {
+			// Tron wallets are watched for outbound transfers and USDT freeze state.
+			if !watchlistTronConfigured() {
+				writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "tron_provider_not_configured", "network": req.Network})
+				return
+			}
+			if _, err := tron.Address(req.Target); err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_tron_address"})
+				return
+			}
+			break
+		}
 		// EVM wallets are watched for EIP-7702 delegation only.
 		evm, configured := watchlistEVMWalletNetwork(req.Network)
 		if !evm {
@@ -475,6 +494,9 @@ func (h *Handler) refreshWatchlistTarget(ctx context.Context, authSubject, id st
 		return target, 0, err
 	}
 	if target.TargetType == "wallet" {
+		if watchlistTronWalletNetwork(target.Network) {
+			return h.refreshWatchlistTronWallet(ctx, authSubject, target, oldSnapshotRaw)
+		}
 		if evm, _ := watchlistEVMWalletNetwork(target.Network); evm {
 			return h.refreshWatchlistEVMWallet(ctx, authSubject, target, oldSnapshotRaw)
 		}

@@ -34,13 +34,41 @@ type RadarNetworkProviders struct {
 	Genesis     string        `json:"genesis,omitempty"`
 }
 
+// toncenterMainnetURL serves both the toncenter /api/v2 and /api/v3 paths the
+// TON adapter requests. It is used only through the TONCENTER_API_KEY fallback.
+const toncenterMainnetURL = "https://toncenter.com"
+
 // RADAR_PROVIDERS_JSON is server-only. URLs, credentials and upstream errors never enter results.
+// Malformed JSON fails closed to no providers at all, including the fallbacks below.
 func RadarProviderConfig() map[string]RadarNetworkProviders {
 	out := map[string]RadarNetworkProviders{}
-	if json.Unmarshal([]byte(os.Getenv("RADAR_PROVIDERS_JSON")), &out) != nil {
-		return map[string]RadarNetworkProviders{}
+	if raw := strings.TrimSpace(os.Getenv("RADAR_PROVIDERS_JSON")); raw != "" {
+		if json.Unmarshal([]byte(raw), &out) != nil {
+			return map[string]RadarNetworkProviders{}
+		}
+		if out == nil {
+			out = map[string]RadarNetworkProviders{}
+		}
 	}
+	applyToncenterKeyFallback(out)
 	return out
+}
+
+// applyToncenterKeyFallback lets an operator who only holds a toncenter API key
+// enable the observe-only TON adapter without hand-writing RADAR_PROVIDERS_JSON.
+// An explicit "ton-mainnet" entry always wins. The key travels only in the
+// X-API-Key request header and never enters results or capability output.
+func applyToncenterKeyFallback(cfg map[string]RadarNetworkProviders) {
+	key := strings.TrimSpace(os.Getenv("TONCENTER_API_KEY"))
+	if key == "" {
+		return
+	}
+	if _, explicit := cfg["ton-mainnet"]; explicit {
+		return
+	}
+	cfg["ton-mainnet"] = RadarNetworkProviders{
+		Primary: RadarProvider{URL: toncenterMainnetURL, Headers: map[string]string{"X-API-Key": key}},
+	}
 }
 
 var radarHTTPClient = &http.Client{Timeout: 8 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
