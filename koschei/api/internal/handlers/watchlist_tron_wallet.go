@@ -3,7 +3,6 @@ package handlers
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -19,6 +18,7 @@ import (
 	"time"
 
 	"koschei/api/internal/radaradapter/tron"
+	"koschei/api/internal/services"
 )
 
 // A Tron wallet on the watchlist is re-read every minute for new outbound
@@ -101,27 +101,12 @@ func watchlistTronCheckInterval() time.Duration {
 	return time.Minute
 }
 
-// watchlistTronBridges reads the operator-pinned bridge/swap deposit registry.
-// Entries need a valid Tron address, a label and an HTTPS attribution source;
-// anything else is ignored, so an empty or malformed registry tags nothing.
+// watchlistTronBridges reads the operator-pinned bridge/swap deposit registry
+// shared with the Tron Flow Radar.
 func watchlistTronBridges() map[string]watchlistTronBridge {
 	out := map[string]watchlistTronBridge{}
-	raw := strings.TrimSpace(os.Getenv("WATCHLIST_TRON_BRIDGE_ADDRESSES_JSON"))
-	if raw == "" {
-		return out
-	}
-	var entries map[string]watchlistTronBridge
-	if json.Unmarshal([]byte(raw), &entries) != nil {
-		return out
-	}
-	for address, entry := range entries {
-		canonical, err := tron.Address(strings.TrimSpace(address))
-		label := strings.TrimSpace(entry.Label)
-		source, perr := url.Parse(strings.TrimSpace(entry.Source))
-		if err != nil || label == "" || len(label) > 80 || perr != nil || source.Scheme != "https" || source.Host == "" {
-			continue
-		}
-		out[canonical] = watchlistTronBridge{Label: label, Source: source.String()}
+	for address, bridge := range services.TronPinnedBridges() {
+		out[address] = watchlistTronBridge{Label: bridge.Label, Source: bridge.Source}
 	}
 	return out
 }
@@ -322,24 +307,7 @@ func watchlistTronUSDTFreezeState(ctx context.Context, hexAddress string) string
 }
 
 func parseWatchlistTronFreezeState(raw []byte) string {
-	var payload struct {
-		Result struct {
-			Result bool `json:"result"`
-		} `json:"result"`
-		ConstantResult []string `json:"constant_result"`
-	}
-	if json.Unmarshal(raw, &payload) != nil || !payload.Result.Result || len(payload.ConstantResult) != 1 {
-		return watchlistTronFreezeUnknown
-	}
-	word := strings.ToLower(payload.ConstantResult[0])
-	switch word {
-	case strings.Repeat("0", 64):
-		return watchlistTronFreezeClear
-	case strings.Repeat("0", 63) + "1":
-		return watchlistTronFreezeFrozen
-	default:
-		return watchlistTronFreezeUnknown
-	}
+	return services.ParseTronUSDTFreezeWord(raw)
 }
 
 // formatWatchlistTronAmount renders an integer amount with its decimals,
@@ -362,29 +330,9 @@ func formatWatchlistTronAmount(valueRaw string, decimals *int) string {
 	return whole.String() + "." + frac
 }
 
-// watchlistTronBase58 renders a validated 41-prefixed hex address in the
-// Base58Check form wallets display; it returns "" if the input is not one.
+// watchlistTronBase58 renders a 41-hex address in Base58Check wallet form.
 func watchlistTronBase58(hexAddress string) string {
-	payload, err := hex.DecodeString(hexAddress)
-	if err != nil || len(payload) != 21 || payload[0] != 0x41 {
-		return ""
-	}
-	first := sha256.Sum256(payload)
-	second := sha256.Sum256(first[:])
-	full := append(append([]byte{}, payload...), second[:4]...)
-	const alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
-	n := new(big.Int).SetBytes(full)
-	mod := new(big.Int)
-	out := []byte{}
-	for n.Sign() > 0 {
-		n.DivMod(n, big.NewInt(58), mod)
-		out = append([]byte{alphabet[mod.Int64()]}, out...)
-	}
-	encoded := string(out)
-	if roundTrip, err := tron.Address(encoded); err != nil || roundTrip != strings.ToLower(hexAddress) {
-		return ""
-	}
-	return encoded
+	return services.TronBase58(hexAddress)
 }
 
 func (t watchlistTronTransfer) displayTo() string {

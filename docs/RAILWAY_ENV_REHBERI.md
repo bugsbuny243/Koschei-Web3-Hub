@@ -163,6 +163,26 @@ durumu) ve owner oturumuyla `GET /api/owner/radar/capabilities`.
 
 ---
 
+### 3.3 Tron Flow Radar (ağ çapında, bellekte)
+
+Her kesinleşmiş (solidified) Tron bloğunu okur; seed cüzdanlardan çıkan USDT'yi tüm ağda
+adım adım takip eder. Blok, transfer veya takip edilen adres **veritabanına yazılmaz**;
+yalnızca aksiyon alınabilir bulgular (seed çıkışı, fan-out, köprü çıkışı, dondurulmamış
+büyük alıcı) saatlik sınırla ve tekrar anahtarıyla güvenlik alarmı olur. Açılışı etkilemez (🟢).
+
+| Env | Not |
+|---|---|
+| `KOSCHEI_TRON_FLOW_RADAR_ENABLED=1` | Varsayılan kapalı. `TRONGRID_API_KEY` gerekir. |
+| `KOSCHEI_TRON_FLOW_RADAR_SEEDS` | Virgülle seed cüzdanlar. Aktif Tron watchlist cüzdanları 5 dakikada bir otomatik eklenir. |
+| `_MIN_FOLLOW_USDT` (10000), `_MAX_HOPS` (4, en fazla 8) | Takip eşiği ve derinliği. |
+| `_BURST_COUNT` (10) / `_BURST_WINDOW_SECONDS` (600) | Script'le dağıtım tespiti. |
+| `_FREEZE_CHECK_USDT` (1000000) | Bu kadar takipli USDT alan adres için Tether dondurma durumu okunur; dondurulmamışsa bulgu. |
+| `_BRIDGE_ALERT_USDT` (1000000) | Seed'e bağlı olmasa da köprüye giden tek büyük USDT yatırımı için bilgi bulgusu. |
+| `_MAX_TRACKED` (20000), `_MAX_FINDINGS_PER_HOUR` (30) | Bellek ve alarm sınırları. |
+| `_POLL_SECONDS` (3), `_MAX_BLOCKS_PER_CYCLE` (20), `_BACKFILL_BLOCKS` (0) | Okuma temposu. 3 sn ile günde ~58 bin, 6 sn ile ~43 bin TronGrid isteği (blok başına 1 + head sorguları); planınızın kotasını kontrol edin. |
+
+Durum: runtime health panelinde `worker.tron-flow-radar` (head, cursor, bekleyen blok).
+
 ## 4. Sürekli küresel radar (ClickHouse) — ⚠️ fail-closed
 
 Sıra önemlidir. Her adımdan sonra deploy loglarında `CRITICAL` satırı olmadığını kontrol edin.
