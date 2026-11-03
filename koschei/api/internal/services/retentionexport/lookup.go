@@ -97,6 +97,29 @@ func LookupArchiveEvidence(ctx context.Context, db *sql.DB, data []byte, expecte
 		if err := json.Unmarshal(line, &row); err != nil {
 			return ArchiveLookupResult{Matches: []ArchiveEvidenceMatch{}}, fmt.Errorf("archive lookup decode failed: %w", err)
 		}
+		// The metadata source identity must be present in the actual
+		// payload, even for nonmatching rows. A valid object/row SHA
+		// alone does not bind a forged source_id to its JSONB record.
+		target, known := typedRestoreTargets[row.SourceTable]
+		if !known {
+			return ArchiveLookupResult{Matches: []ArchiveEvidenceMatch{}}, fmt.Errorf("archive lookup object contains unmanaged source table")
+		}
+		var fields map[string]json.RawMessage
+		if err := json.Unmarshal(row.Payload, &fields); err != nil {
+			return ArchiveLookupResult{Matches: []ArchiveEvidenceMatch{}}, fmt.Errorf("archive lookup payload identity invalid")
+		}
+		rawID := bytes.TrimSpace(fields[target.IDColumn])
+		var payloadID string
+		if len(rawID) > 0 && rawID[0] == '"' {
+			if err := json.Unmarshal(rawID, &payloadID); err != nil {
+				return ArchiveLookupResult{Matches: []ArchiveEvidenceMatch{}}, fmt.Errorf("archive lookup payload identity invalid")
+			}
+		} else {
+			payloadID = string(rawID)
+		}
+		if payloadID == "" || payloadID != row.SourceID {
+			return ArchiveLookupResult{Matches: []ArchiveEvidenceMatch{}}, fmt.Errorf("archive lookup source identity parity failed")
+		}
 		if row.SourceTable != filter.SourceTable ||
 			(filter.SourceID != "" && row.SourceID != filter.SourceID) ||
 			(!filter.ArchivedFrom.IsZero() && row.ArchivedAt.Before(filter.ArchivedFrom)) ||
