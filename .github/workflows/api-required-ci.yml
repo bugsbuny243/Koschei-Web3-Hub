@@ -191,6 +191,20 @@ jobs:
           set -o pipefail
           go test -v ./internal/services/retentionexport -run TestArchiveStagingChecksumMustMatchPayloadPostgres17 -count=1 2>&1 | tee /tmp/koschei-archive-staging-integrity.log
           grep -Fq -- '--- PASS: TestArchiveStagingChecksumMustMatchPayloadPostgres17' /tmp/koschei-archive-staging-integrity.log
+      - name: Verify read-only bounded archive evidence lookup (PostgreSQL 17)
+        env:
+          KOSCHEI_TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/koschei_ci?sslmode=disable
+        run: |
+          set -o pipefail
+          go test -v ./internal/services/retentionexport -run TestArchiveEvidenceLookupVerifiesWholeObjectPostgres17 -count=1 2>&1 | tee /tmp/koschei-archive-evidence-lookup.log
+          grep -Fq -- '--- PASS: TestArchiveEvidenceLookupVerifiesWholeObjectPostgres17' /tmp/koschei-archive-evidence-lookup.log
+      - name: Reject archive lookup without independently approved object SHA
+        run: |
+          if go run ./cmd/retention-lookup -file /tmp/not-a-real-archive.ndjson -source-table security_radar_events -source-id ci-only >/tmp/koschei-archive-lookup-no-sha.log 2>&1; then
+            echo 'ERROR: archive evidence lookup accepted a missing object digest' >&2
+            exit 1
+          fi
+          grep -Fq 'requires -file, -sha256 and -source-table' /tmp/koschei-archive-lookup-no-sha.log
       - name: Reject unbound restore-acceptance CLI requests
         run: |
           if go run ./cmd/retention-verify -file /tmp/koschei-nonexistent-archive.ndjson -restore-acceptance > /tmp/koschei-restore-missing-sha.log 2>&1; then
