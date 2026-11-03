@@ -72,8 +72,8 @@ func TestArchiveEvidenceLookupVerifiesWholeObjectPostgres17(t *testing.T) {
 
 	// Time-bounded search uses ARCHIVED timestamp and never exposes payloads.
 	bounded, err := LookupArchiveEvidence(ctx, db, data, digest, ArchiveLookupFilter{
-		SourceTable: "security_radar_events",
-		ArchivedFrom: when.Add(24 * time.Hour),
+		SourceTable:   "security_radar_events",
+		ArchivedFrom:  when.Add(24 * time.Hour),
 		ArchivedUntil: when.Add(72 * time.Hour),
 	})
 	if err != nil || len(bounded.Matches) != 1 || bounded.Matches[0].SourceID != "event-b" {
