@@ -40,6 +40,7 @@ var databaseOptionalAPIPaths = func() map[string]struct{} {
 		"/api/owner/radar/unified",
 		"/api/owner/radar/capabilities",
 		"/api/owner/radar/tron-flow",
+		"/api/owner/radar/tron-flow/evidence",
 		"/api/owner/radar/investigate",
 		"/api/owner/radar/global/records",
 		"/api/owner/radar/global/events",

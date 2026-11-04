@@ -26,7 +26,7 @@ func TestOwnerProductionShellLoadsTronFlowRadarPanel(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(page), `<script src="/js/owner-tron-flow-radar-v1.js?v=1"></script>`) {
+	if !strings.Contains(string(page), `<script src="/js/owner-tron-flow-radar-v1.js?v=2"></script>`) {
 		t.Fatal("owner production shell must load the Tron Flow Radar panel")
 	}
 	script, err := os.ReadFile("../../public/js/owner-tron-flow-radar-v1.js")
@@ -37,5 +37,13 @@ func TestOwnerProductionShellLoadsTronFlowRadarPanel(t *testing.T) {
 		if !strings.Contains(string(script), required) {
 			t.Fatalf("panel script missing %q", required)
 		}
+	}
+}
+
+func TestOwnerTronFlowEvidencePackageNeedsARunningRadar(t *testing.T) {
+	rec := httptest.NewRecorder()
+	(&Handler{}).OwnerTronFlowEvidencePackage(rec, httptest.NewRequest(http.MethodGet, "/api/owner/radar/tron-flow/evidence?finding=tron-flow:x", nil))
+	if rec.Code != http.StatusNotFound || !strings.Contains(rec.Body.String(), "tron_flow_radar_not_running") {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 	}
 }
