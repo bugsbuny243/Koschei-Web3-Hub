@@ -104,9 +104,9 @@ func (h *Handler) persistedTronFlowFinding(ctx context.Context, key string) (ser
 		return services.TronFlowFinding{}, err
 	}
 	var detail struct {
-		Kind string `json:"kind"`
-		ObservedAt time.Time `json:"observed_at"`
-		Evidence map[string]any `json:"evidence"`
+		Kind       string         `json:"kind"`
+		ObservedAt time.Time      `json:"observed_at"`
+		Evidence   map[string]any `json:"evidence"`
 	}
 	if len(payload) > 1<<20 || json.Unmarshal(payload, &detail) != nil ||
 		detail.Kind == "" || detail.ObservedAt.IsZero() || detail.Evidence == nil ||
