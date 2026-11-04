@@ -21,7 +21,7 @@ const kindLabel={tron_flow_seed_outflow:'Seed outflow',tron_flow_fan_out:'Script
 const actionLabel=value=>{const text=String(value||'');if(text==='issuer_freeze_request:tether_usdt')return'Ask Tether to freeze';if(text.startsWith('bridge_operator_notice:'))return`Notify ${text.slice(23)}`;if(text==='receiving_party_notice')return'Notify receiving party';return text};
 
 function panelMarkup(){
-  return `<article class="card span-12" id="ownerTronFlowRadarPanel"><div class="card-head"><div><span class="eyebrow">TRON FLOW RADAR · IN MEMORY · OBSERVE ONLY</span><h2>Network-wide USDT follow from seed wallets</h2><p class="muted">Reads every solidified Tron block and follows USDT leaving seed wallets hop by hop. Nothing per block, transfer or address is stored; only capped findings become security alerts. Koschei cannot reverse a transfer, so each finding names who can hold the funds.</p></div><span class="badge warn" id="ownerTronFlowRadarState">LOADING</span></div><div id="ownerTronFlowRadarBody" class="section-gap"><div class="card loading">Loading Tron Flow Radar state…</div></div></article>`;
+  return `<article class="card span-12" id="ownerTronFlowRadarPanel"><div class="card-head"><div><span class="eyebrow">TRON FLOW RADAR · IN MEMORY · OBSERVE ONLY</span><h2>Network-wide USDT follow from seed wallets</h2><p class="muted">Reads every solidified Tron block and follows USDT leaving seed wallets hop by hop. Nothing per block, transfer or address is stored; only capped findings become security alerts. Koschei cannot reverse a transfer, so each finding names who can hold the funds and can be downloaded as a signed evidence package for them.</p></div><span class="badge warn" id="ownerTronFlowRadarState">LOADING</span></div><div id="ownerTronFlowRadarBody" class="section-gap"><div class="card loading">Loading Tron Flow Radar state…</div></div></article>`;
 }
 
 async function fetchState(){
@@ -37,8 +37,8 @@ async function fetchState(){
 function findingsTable(findings){
   if(!findings.length)return'<div class="empty">No findings yet. Findings appear when a seed wallet moves USDT, a followed wallet fans out, followed funds enter a pinned bridge, or an unfrozen address accumulates followed USDT.</div>';
   const rows=findings.map(item=>{const evidence=item.evidence||{};const actions=arr(evidence.response_options).map(actionLabel).map(esc).join('<br>')||'—';const hop=evidence.hop===undefined?'':` · hop ${esc(evidence.hop)}`;
-    return `<tr><td class="small">${esc(dt(item.observed_at))}</td><td>${badge(severityTone(item.severity),item.severity)}</td><td><b>${esc(kindLabel[item.kind]||item.kind)}</b><div class="muted small">${esc(evidence.amount||'')}${hop}</div></td><td>${addressLink(item.address)}</td><td class="small">${esc(item.message)}</td><td class="small">${actions}</td><td>${txLink(evidence.transaction_id)}</td></tr>`;}).join('');
-  return `<div class="table-wrap"><table class="table"><thead><tr><th>Observed</th><th>Severity</th><th>Finding</th><th>Address</th><th>What happened</th><th>Who can hold funds</th><th>Transaction</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    return `<tr><td class="small">${esc(dt(item.observed_at))}</td><td>${badge(severityTone(item.severity),item.severity)}</td><td><b>${esc(kindLabel[item.kind]||item.kind)}</b><div class="muted small">${esc(evidence.amount||'')}${hop}</div></td><td>${addressLink(item.address)}</td><td class="small">${esc(item.message)}</td><td class="small">${actions}</td><td>${txLink(evidence.transaction_id)}</td><td><button class="btn" type="button" data-tron-evidence="${esc(item.dedupe_key)}">Download package</button></td></tr>`;}).join('');
+  return `<div class="table-wrap"><table class="table"><thead><tr><th>Observed</th><th>Severity</th><th>Finding</th><th>Address</th><th>What happened</th><th>Who can hold funds</th><th>Transaction</th><th>Signed evidence</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 function followedTable(followed){
@@ -71,9 +71,21 @@ function schedule(){
   timer=setInterval(()=>{if(document.visibilityState==='visible')refresh();},REFRESH_MS);
 }
 
+async function downloadEvidence(button){
+  const key=button.getAttribute('data-tron-evidence');if(!key)return;const label=button.textContent;button.disabled=true;button.textContent='Preparing…';
+  try{
+    const response=await fetch('/api/owner/radar/tron-flow/evidence?finding='+encodeURIComponent(key),{credentials:'same-origin',cache:'no-store'});
+    if(!response.ok){const data=await response.json().catch(()=>({}));throw new Error(data.error||`HTTP ${response.status}`);}
+    const blob=await response.blob();const url=URL.createObjectURL(blob);const link=document.createElement('a');
+    link.href=url;link.download='koschei-'+key.replace(/[^a-z0-9-]+/gi,'-').slice(0,90)+'.json';document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+    button.textContent='Downloaded';
+  }catch(error){button.textContent='Unavailable';button.title=String(error?.message||'unknown error');}
+  finally{setTimeout(()=>{button.disabled=false;button.textContent=label;},2500);}
+}
+
 function ensurePanel(){
   const root=document.getElementById('securityContent');if(!root||!root.children.length||document.getElementById('ownerTronFlowRadarPanel'))return;
-  const grid=root.querySelector(':scope > .grid.compact-grid')||root;grid.insertAdjacentHTML('beforeend',panelMarkup());refresh();schedule();
+  const grid=root.querySelector(':scope > .grid.compact-grid')||root;grid.insertAdjacentHTML('beforeend',panelMarkup());document.getElementById('ownerTronFlowRadarPanel')?.addEventListener('click',event=>{const button=event.target.closest?.('[data-tron-evidence]');if(button)downloadEvidence(button);});refresh();schedule();
 }
 
 const root=document.getElementById('securityContent');if(root){new MutationObserver(ensurePanel).observe(root,{childList:true});ensurePanel();}

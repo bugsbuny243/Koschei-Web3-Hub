@@ -500,7 +500,7 @@ func (s *SolanaRPC) deferRPCEndpoint(endpoint string, delay time.Duration) {
 func callSolanaRPC(ctx context.Context, client *http.Client, endpoint, method string, body []byte, target any) error {
 	req, err := outboundhttp.NewRequest(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
-		LogRPCFailure(method, endpoint, 0, err)
+		logRPCFailureUnlessCallerCanceled(ctx, method, endpoint, 0, err)
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
@@ -508,7 +508,7 @@ func callSolanaRPC(ctx context.Context, client *http.Client, endpoint, method st
 	// and same-origin redirects apply to this Solana RPC path as well.
 	resp, err := outboundhttp.Do(client, req)
 	if err != nil {
-		LogRPCFailure(method, endpoint, 0, err)
+		logRPCFailureUnlessCallerCanceled(ctx, method, endpoint, 0, err)
 		return err
 	}
 	defer resp.Body.Close()
@@ -518,31 +518,31 @@ func callSolanaRPC(ctx context.Context, client *http.Client, endpoint, method st
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		err := &solanaRPCStatusError{Status: resp.StatusCode, RetryAfter: resp.Header.Get("Retry-After")}
-		LogRPCFailure(method, actualEndpoint, resp.StatusCode, err)
+		logRPCFailureUnlessCallerCanceled(ctx, method, actualEndpoint, resp.StatusCode, err)
 		return err
 	}
 	var env solanaRPCEnvelope
 	if err := json.NewDecoder(resp.Body).Decode(&env); err != nil {
-		LogRPCFailure(method, actualEndpoint, resp.StatusCode, err)
+		logRPCFailureUnlessCallerCanceled(ctx, method, actualEndpoint, resp.StatusCode, err)
 		return err
 	}
 	if env.Error != nil {
 		if env.Error.Code == http.StatusTooManyRequests {
 			err := &solanaRPCStatusError{Status: http.StatusTooManyRequests}
-			LogRPCFailure(method, actualEndpoint, resp.StatusCode, err)
+			logRPCFailureUnlessCallerCanceled(ctx, method, actualEndpoint, resp.StatusCode, err)
 			return err
 		}
 		err := fmt.Errorf("rpc error: %s", env.Error.Message)
-		LogRPCFailure(method, actualEndpoint, resp.StatusCode, err)
+		logRPCFailureUnlessCallerCanceled(ctx, method, actualEndpoint, resp.StatusCode, err)
 		return err
 	}
 	if len(env.Result) == 0 || string(env.Result) == "null" {
 		err := fmt.Errorf("rpc result unavailable")
-		LogRPCFailure(method, actualEndpoint, resp.StatusCode, err)
+		logRPCFailureUnlessCallerCanceled(ctx, method, actualEndpoint, resp.StatusCode, err)
 		return err
 	}
 	if err := json.Unmarshal(env.Result, target); err != nil {
-		LogRPCFailure(method, actualEndpoint, resp.StatusCode, err)
+		logRPCFailureUnlessCallerCanceled(ctx, method, actualEndpoint, resp.StatusCode, err)
 		return err
 	}
 	return nil

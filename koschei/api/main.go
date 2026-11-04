@@ -32,6 +32,7 @@ const (
 )
 
 func main() {
+	log.SetOutput(levelRoutingWriter{out: os.Stdout, errOut: os.Stderr})
 	log.Printf("koschei api starting")
 	if missing := services.MissingProductionSecurityEnv(); len(missing) > 0 {
 		log.Fatalf("CRITICAL: missing required production security env vars: %s", strings.Join(missing, ", "))
