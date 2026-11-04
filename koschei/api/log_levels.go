@@ -16,10 +16,12 @@ type levelRoutingWriter struct {
 	errOut io.Writer
 }
 
+var logZeroFailureCounter = regexp.MustCompile(`(?i)\b(?:critical|fatal|panic|error|failed|failure|halted|unavailable|refused|denied|cannot)\s*=\s*0(?:\.0+)?\b`)
+
 var logFailureMarker = regexp.MustCompile(`(?i)\b(critical|fatal|panic|error|failed|failure|halted|unavailable|refused|denied|cannot|could not)\b`)
 
 func logLineIsFailure(line []byte) bool {
-	return logFailureMarker.Match(line)
+	return logFailureMarker.Match(logZeroFailureCounter.ReplaceAll(line, nil))
 }
 
 func (w levelRoutingWriter) Write(p []byte) (int, error) {
