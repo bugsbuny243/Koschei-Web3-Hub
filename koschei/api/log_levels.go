@@ -16,7 +16,7 @@ type levelRoutingWriter struct {
 	errOut io.Writer
 }
 
-var logZeroFailureCounter = regexp.MustCompile(`(?i)\b(?:critical|fatal|panic|error|failed|failure|halted|unavailable|refused|denied|cannot)\s*=\s*0(?:\.0+)?\b`)
+var logZeroFailureCounter = regexp.MustCompile(`(?i)\b(?:critical|fatal|panic|error|failed|failure|halted|unavailable|refused|denied|cannot)\s*=\s*0(?:\.0+)?(?:[^\w.]|$)`)
 
 var logFailureMarker = regexp.MustCompile(`(?i)\b(critical|fatal|panic|error|failed|failure|halted|unavailable|refused|denied|cannot|could not)\b`)
 
