@@ -47,7 +47,7 @@ func TestLogLevelRoutingSeparatesFailuresFromProgress(t *testing.T) {
 
 func TestLogZeroFailureCounters(t *testing.T) {
 	for _, tc := range []struct {
-		line string
+		line    string
 		failure bool
 	}{
 		{"worker summary processed=25 failed=0 denied=0 unavailable=0", false},
