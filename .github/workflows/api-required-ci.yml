@@ -65,6 +65,10 @@ jobs:
           node --test public/js/__tests__/owner-multichain-radar.test.cjs
       - name: Verify public liveness truth contract
         run: node --test scripts/verify-public-health-liveness.test.cjs
+      - name: Verify public badge and static route fail-closed acceptance
+        run: |
+          go test ./internal/handlers -run '^(TestClassifyRadarAccountObservationSeparatesSolanaTargetKinds|TestRadarTargetParsedMintRequiresVerifiedTokenProgramOwner|TestClassifyRadarAccountObservationNilFailsClosed)$' -count=1
+          go test ./internal/http -run '^TestAudit' -count=1
       - name: Verify ARVIS widget and Shield SDK never turn missing evidence into allow
         run: node --test public/js/__tests__/arvis-widget-shield-failclosed.test.cjs
       - name: Verify browser logout and return-URL security
@@ -120,6 +124,44 @@ jobs:
           path: ${{ runner.temp }}/retention-archive-postgres17.txt
           if-no-files-found: warn
           retention-days: 7
+      - name: Assert no source deletion without per-row external archive receipt
+        run: |
+          set -o pipefail
+          go test -v ./internal/services -run '^(TestRetentionSourceDeletionRequiresExternalRowProof|TestStreamRetentionParityFlagsDoNotBypassExternalArchiveProof)$' -count=1 2>&1 | tee "${RUNNER_TEMP}/retention-external-row-proof.txt"
+          grep -q -- '--- PASS: TestRetentionSourceDeletionRequiresExternalRowProof' "${RUNNER_TEMP}/retention-external-row-proof.txt"
+          grep -q -- '--- PASS: TestStreamRetentionParityFlagsDoNotBypassExternalArchiveProof' "${RUNNER_TEMP}/retention-external-row-proof.txt"
+      - name: Verify disabled archive cannot authorize deletion (PostgreSQL 17)
+        env:
+          KOSCHEI_TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/koschei_ci?sslmode=disable
+        run: |
+          set -o pipefail
+          go test -v ./internal/services -run '^(TestRetentionExternalArchiveDisabledFailsClosed|TestRetentionDurableExportPreflightRequiresSecureS3|TestRetentionV2DisabledArchiveSinkRecordsHaltPostgres17)$' -count=1 2>&1 | tee "${RUNNER_TEMP}/retention-disabled-sink-postgres17.txt"
+          grep -q -- '--- PASS: TestRetentionExternalArchiveDisabledFailsClosed' "${RUNNER_TEMP}/retention-disabled-sink-postgres17.txt"
+          grep -q -- '--- PASS: TestRetentionDurableExportPreflightRequiresSecureS3' "${RUNNER_TEMP}/retention-disabled-sink-postgres17.txt"
+          grep -q -- '--- PASS: TestRetentionV2DisabledArchiveSinkRecordsHaltPostgres17' "${RUNNER_TEMP}/retention-disabled-sink-postgres17.txt"
+      - name: Upload disabled-sink PostgreSQL log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: retention-disabled-sink-postgres17
+          path: ${{ runner.temp }}/retention-disabled-sink-postgres17.txt
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Verify archive preflight failure is durably halted (PostgreSQL 17)
+        env:
+          KOSCHEI_TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/koschei_ci?sslmode=disable
+        run: |
+          set -o pipefail
+          go test -v ./internal/services -run '^TestRetentionV2ArchivePreflightFailureRecordsHaltPostgres17$' -count=1 2>&1 | tee "${RUNNER_TEMP}/retention-preflight-halt-postgres17.txt"
+          grep -q -- '--- PASS: TestRetentionV2ArchivePreflightFailureRecordsHaltPostgres17' "${RUNNER_TEMP}/retention-preflight-halt-postgres17.txt"
+      - name: Upload preflight halt PostgreSQL log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: retention-preflight-halt-postgres17
+          path: ${{ runner.temp }}/retention-preflight-halt-postgres17.txt
+          if-no-files-found: warn
+          retention-days: 7
       - name: Validate retention archive export on PostgreSQL 17
         env:
           KOSCHEI_TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/koschei_ci?sslmode=disable
@@ -137,7 +179,39 @@ jobs:
       - name: Validate retention restore acceptance on PostgreSQL 17
         env:
           KOSCHEI_TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/koschei_ci?sslmode=disable
-        run: go test -v ./internal/services/retentionexport -run '^TestVerifyRestoreAcceptancePostgres17$' -count=1
+        run: |
+          set -o pipefail
+          go test -v ./internal/services/retentionexport -run '^(TestVerifyRestoreAcceptancePostgres17|TestArchiveExportRunFailureStoresOnlySafeErrorPostgres17)$' -count=1 2>&1 | tee /tmp/koschei-restore-acceptance.log
+          grep -Fq -- '--- PASS: TestVerifyRestoreAcceptancePostgres17' /tmp/koschei-restore-acceptance.log
+          grep -Fq -- '--- PASS: TestArchiveExportRunFailureStoresOnlySafeErrorPostgres17' /tmp/koschei-restore-acceptance.log
+      - name: Reject corrupt archive staging checksums before external export
+        env:
+          KOSCHEI_TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/koschei_ci?sslmode=disable
+        run: |
+          set -o pipefail
+          go test -v ./internal/services/retentionexport -run TestArchiveStagingChecksumMustMatchPayloadPostgres17 -count=1 2>&1 | tee /tmp/koschei-archive-staging-integrity.log
+          grep -Fq -- '--- PASS: TestArchiveStagingChecksumMustMatchPayloadPostgres17' /tmp/koschei-archive-staging-integrity.log
+      - name: Verify read-only bounded archive evidence lookup (PostgreSQL 17)
+        env:
+          KOSCHEI_TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/koschei_ci?sslmode=disable
+        run: |
+          set -o pipefail
+          go test -v ./internal/services/retentionexport -run TestArchiveEvidenceLookupVerifiesWholeObjectPostgres17 -count=1 2>&1 | tee /tmp/koschei-archive-evidence-lookup.log
+          grep -Fq -- '--- PASS: TestArchiveEvidenceLookupVerifiesWholeObjectPostgres17' /tmp/koschei-archive-evidence-lookup.log
+      - name: Reject archive lookup without independently approved object SHA
+        run: |
+          if go run ./cmd/retention-lookup -file /tmp/not-a-real-archive.ndjson -source-table security_radar_events -source-id ci-only >/tmp/koschei-archive-lookup-no-sha.log 2>&1; then
+            echo 'ERROR: archive evidence lookup accepted a missing object digest' >&2
+            exit 1
+          fi
+          grep -Fq 'requires -file, -sha256 and -source-table' /tmp/koschei-archive-lookup-no-sha.log
+      - name: Reject unbound restore-acceptance CLI requests
+        run: |
+          if go run ./cmd/retention-verify -file /tmp/koschei-nonexistent-archive.ndjson -restore-acceptance > /tmp/koschei-restore-missing-sha.log 2>&1; then
+            echo 'ERROR: restore accepted missing independently supplied SHA' >&2
+            exit 1
+          fi
+          grep -Fq 'restore acceptance requires -sha256' /tmp/koschei-restore-missing-sha.log
       - name: Validate immutable dossier storage
         env:
           PGPASSWORD: postgres

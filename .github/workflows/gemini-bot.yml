@@ -2,37 +2,92 @@ name: Gemini Code Reviewer
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
+
+# This optional adviser has no write permissions. It does not inspect code;
+# actual security, build, and release gates live in the required workflows.
+permissions:
+  contents: read
 
 jobs:
   gemini-review:
-  runs-on: ubuntu-latest
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-
-      - name: Install Google GenAI SDK
-        run: pip install google-genai
-
-      - name: Run Gemini Script
+      - name: Check Gemini API availability
+        id: available
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          python -c "
-          from google import genai
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "Gemini advisory not run: GEMINI_API_KEY is not configured or unavailable to this event." >> "$GITHUB_STEP_SUMMARY"
+            echo "::notice::Gemini advisory skipped; no model review was performed."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Python
+        if: steps.available.outputs.configured == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Google GenAI SDK
+        if: steps.available.outputs.configured == 'true'
+        run: python -m pip install --disable-pip-version-check google-genai
+
+      - name: Generate generic security checklist (no source code sent)
+        if: steps.available.outputs.configured == 'true'
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          python - <<'PY'
           import os
-          
-          client = genai.Client(api_key=os.environ['GEMINI_API_KEY'])
-          response = client.models.generate_content(
-              model='gemini-3.8-flash', # Veya güncel argon/model tanımlayıcısı
-              contents='Bu reponun güvenlik ve kod kalitesi açısından genel bir incelemesini yap.'
+          from pathlib import Path
+          from google import genai
+          from google.genai import errors
+
+          prompt = (
+              "Produce a concise security review CHECKLIST, not findings, for "
+              "a public Go API that classifies Solana SPL Token and Token-2022 accounts, "
+              "produces fail-closed risk badges, and validates signed decisions. "
+              "Discuss independent owner-program verification, unsigned-result "
+              "withhold behavior, replay resistance, and PostgreSQL entitlement/receipt "
+              "checks. You are not given code: explicitly state that no repository "
+              "inspection or vulnerability verification was performed."
           )
-          print(response.text)
-          "
+          # This is a non-authoritative advisory. Provider saturation should
+          # be visibly reported as unavailable, never as a completed review.
+          try:
+              with genai.Client(api_key=os.environ["GEMINI_API_KEY"]) as client:
+                  result = client.models.generate_content(
+                      model="gemini-3.8-flash",
+                      contents=prompt,
+                  )
+          except (errors.ServerError, errors.ClientError) as exc:
+              # Only known provider availability/quota failures make this
+              # optional advisory unavailable. Unexpected auth, SDK and
+              # request errors must continue to fail visibly.
+              description = str(exc)
+              if "503 UNAVAILABLE" in description:
+                  reason = "provider unavailable (503)"
+              elif "429 RESOURCE_EXHAUSTED" in description:
+                  reason = "provider daily quota exhausted (429)"
+              else:
+                  raise
+              message = f"Gemini advisory unavailable ({reason}); no model review was performed."
+              print("::notice::" + message)
+              with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a", encoding="utf-8") as output:
+                  output.write(message + "\n")
+              raise SystemExit(0)
+          answer = (result.text or "").strip()
+          if not answer:
+              raise RuntimeError("Gemini returned an empty checklist")
+          print(answer)
+          with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a", encoding="utf-8") as output:
+              output.write("### Gemini checklist (advisory; no repository code analyzed)\n\n")
+              output.write(answer[:15000] + "\n")
+          PY

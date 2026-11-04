@@ -22,14 +22,21 @@ func TestClassifyRadarAccountObservationSeparatesSolanaTargetKinds(t *testing.T)
 	}{
 		{
 			name: "token mint",
-			account: &services.SolanaAccountInfo{Owner: "Tokenkeg", Data: map[string]any{
+			account: &services.SolanaAccountInfo{Owner: legacySPLTokenProgramID, Data: map[string]any{
 				"parsed": map[string]any{"type": "mint", "info": map[string]any{}},
 			}},
 			wantType: radarTargetTokenMint, wantVerdictAllowed: true,
 		},
 		{
+			name: "token-2022 mint",
+			account: &services.SolanaAccountInfo{Owner: token2022ProgramID, Data: map[string]any{
+				"parsed": map[string]any{"type": "mint"},
+			}},
+			wantType: radarTargetTokenMint, wantVerdictAllowed: true,
+		},
+		{
 			name: "token account",
-			account: &services.SolanaAccountInfo{Owner: "Tokenkeg", Data: map[string]any{
+			account: &services.SolanaAccountInfo{Owner: legacySPLTokenProgramID, Data: map[string]any{
 				"parsed": map[string]any{"type": "account", "info": map[string]any{"owner": "Holder111"}},
 			}},
 			wantType: radarTargetTokenAccount, wantTokenOwner: "Holder111",
@@ -156,5 +163,36 @@ func TestRadarTargetRejectionStatusSeparatesInputErrorsFromUnavailableEvidence(t
 	}
 	if got := radarTargetRejectionStatus(radarTargetClassification{Type: radarTargetWallet, Status: "verified_rpc_observation"}); got != 422 {
 		t.Fatalf("wallet target status = %d, want 422", got)
+	}
+}
+
+func TestRadarTargetParsedMintRequiresVerifiedTokenProgramOwner(t *testing.T) {
+	for _, tc := range []struct {
+		name, owner, parsedType string
+		executable              bool
+		wantType, wantStatus    string
+	}{
+		{"unknown program claims mint", "11111111111111111111111111111111", "mint", false, radarTargetUnknown, "owner_program_mismatch"},
+		{"missing owner claims mint", "", "mint", false, radarTargetUnknown, "owner_program_mismatch"},
+		{"unknown program claims token account", "11111111111111111111111111111111", "account", false, radarTargetUnknown, "owner_program_mismatch"},
+		{"executable account claims mint", legacySPLTokenProgramID, "mint", true, radarTargetProgram, "verified_rpc_observation"},
+		{"token program without parsed type", token2022ProgramID, "", false, radarTargetUnknown, "token_account_type_unresolved"},
+		{"classic token program with unknown parsed type", legacySPLTokenProgramID, "confidential", false, radarTargetUnknown, "token_account_type_unresolved"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			account := &services.SolanaAccountInfo{Owner: tc.owner, Executable: tc.executable, Data: map[string]any{
+				"parsed": map[string]any{"type": tc.parsedType},
+			}}
+			got := classifyRadarAccountObservation(account)
+			if got.Type != tc.wantType || got.Status != tc.wantStatus {
+				t.Fatalf("classification=%+v want type=%q status=%q", got, tc.wantType, tc.wantStatus)
+			}
+			if radarTargetTokenVerdictAllowed(got) {
+				t.Fatalf("mismatched/unresolved account incorrectly authorized as token mint: %+v", got)
+			}
+			if got.Type == radarTargetUnknown && radarTargetRejectionStatus(got) != 503 {
+				t.Fatalf("unresolved target HTTP status=%d, want 503", radarTargetRejectionStatus(got))
+			}
+		})
 	}
 }

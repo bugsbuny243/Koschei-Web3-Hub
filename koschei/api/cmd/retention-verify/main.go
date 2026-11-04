@@ -28,6 +28,11 @@ func main() {
 	if filePath == "" {
 		exitError("retention export file is required")
 	}
+	// Refuse to issue a successful restore-acceptance receipt without a
+	// digest supplied independently from the approved archive object.
+	if restoreAcceptance && strings.TrimSpace(expectedSHA256) == "" {
+		exitError("restore acceptance requires -sha256 from an independently verified archive object")
+	}
 	databaseURL := strings.TrimSpace(os.Getenv("DATABASE_URL"))
 	if databaseURL == "" {
 		databaseURL = strings.TrimSpace(os.Getenv("APP_DATABASE_URL"))

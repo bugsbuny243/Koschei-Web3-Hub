@@ -95,13 +95,19 @@ func TestVerifyRestoreAcceptancePostgres17(t *testing.T) {
 		t.Fatalf("unexpected restore acceptance result: %+v", result)
 	}
 
+	if _, err := VerifyRestoreAcceptance(ctx, db, data, ""); err == nil || !strings.Contains(err.Error(), "object sha256 is required") {
+		t.Fatalf("missing external object checksum must not pass restore acceptance: %v", err)
+	}
+	if _, err := VerifyRestoreAcceptance(ctx, db, data, strings.Repeat("g", 64)); err == nil || !strings.Contains(err.Error(), "must be hexadecimal") {
+		t.Fatalf("malformed external object checksum must not pass restore acceptance: %v", err)
+	}
 	if _, err := VerifyRestoreAcceptance(ctx, db, data, strings.Repeat("0", 64)); err == nil || !strings.Contains(err.Error(), "object checksum mismatch") {
 		t.Fatalf("wrong object checksum was not rejected: %v", err)
 	}
 
 	wrongID := "00000000-0000-0000-0000-000000000000"
 	tamperedIdentity := []byte(strings.Replace(string(data), firstID, wrongID, 1))
-	result, err = VerifyRestoreAcceptance(ctx, db, tamperedIdentity, "")
+	result, err = VerifyRestoreAcceptance(ctx, db, tamperedIdentity, sha256Hex(tamperedIdentity))
 	if err == nil || result.SourceIDMismatches != 1 {
 		t.Fatalf("tampered source identity was not rejected: result=%+v err=%v", result, err)
 	}

@@ -216,17 +216,19 @@ func (h *Handler) SecurityRiskBadge(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, statusCode, map[string]any{"ok": false, "error": "token_mint_required", "message": radarTargetRejectionMessage(classification), "address": address, "target_classification": classification, "risk_index": nil, "risk_level": "unknown", "signed": false})
 		return
 	}
-	analysis := services.AnalyzeArvisRadars(services.SecurityRadarRequest{Target: address, Network: network, Mode: "public_badge"})
-	bundle := services.EvidenceBackedSecurityRadarBundle(analysis.Bundle)
-	final := services.ArvisFinalFromBundle(bundle)
-	if !services.SecurityRadarHasLiveEvidence(bundle) || !final.Signed {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "error": "real_data_unavailable", "message": services.SecurityRadarInsufficientEvidenceMessage, "address": address, "grade": final.Grade, "risk_index": final.RiskIndex, "risk_level": final.RiskLevel, "signed": false})
-		return
-	}
-	if h != nil && h.DB != nil {
-		_ = h.saveSecurityRadarBundle(r.Context(), "", "public_badge", bundle)
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "address": address, "grade": final.Grade, "risk_index": final.RiskIndex, "risk_level": final.RiskLevel, "verdict": final.Verdict, "recommendation": final.Recommendation, "rule_version": final.RuleVersion, "signed": final.Signed, "signature": final.Signature, "verified_arm_count": bundle.Metadata["verified_arm_count"]})
+	// ARVIS's legacy final adapter is intentionally always unsigned. Even if a
+	// future arm advertises Signed=true, that boolean is not cryptographic
+	// verification of the canonical unified decision and cannot authorize a
+	// public grade. Keep this endpoint explicitly withheld until an accepted,
+	// verifiable canonical public-final adapter is installed. Do not run the
+	// costly fourteen-arm provider collectors merely to discard their verdict.
+	writeJSON(w, http.StatusServiceUnavailable, map[string]any{
+		"ok": false, "error": "real_data_unavailable",
+		"message": services.SecurityRadarInsufficientEvidenceMessage,
+		"address": address, "network": network,
+		"grade": "-", "risk_index": nil, "risk_level": "unknown",
+		"verdict": "withhold", "signed": false,
+	})
 }
 
 func (h *Handler) OwnerRadarSummary(w http.ResponseWriter, r *http.Request) {

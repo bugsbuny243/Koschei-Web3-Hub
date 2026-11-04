@@ -95,7 +95,16 @@ func (w *securityRadarRetentionWorkerV2) runOnce(ctx context.Context) {
 		return
 	}
 	if err := w.base.exportPendingArchive(ctx, "before_retention_v2"); err != nil {
-		log.Printf("radar retention v2: halted; %v", err)
+		// Persist the preflight failure before returning. Without this entry
+		// the run ledger can appear healthy even when every scheduled attempt
+		// stops here. Never store the exporter error in the ledger: remote
+		// endpoints or credentials could be embedded in error messages.
+		w.base.recordHaltedRun(ctx, cutoff, "archive_export_preflight_failed")
+		// Avoid logging the raw provider error here: some storage SDK
+		// errors include endpoint URLs or credential-bearing request details.
+		// The fixed code is sufficient to correlate this halt with the
+		// operator's archive configuration and stays safe for log export.
+		log.Printf("radar retention v2: halted; archive_export_preflight_failed; no source rows deleted")
 		return
 	}
 	backlog, err := w.base.unexportedBacklog(ctx)
@@ -211,6 +220,15 @@ func retentionV2DeadlineError(err error) bool {
 }
 
 func (w *securityRadarRetentionWorkerV2) archiveAndDelete(ctx context.Context, runID string, target retentionTarget, cutoff time.Time, stats *runStats) int64 {
+	// Never delete an original row merely because PostgreSQL staging succeeded.
+	// Exact external object receipt/parity has not yet been wired to the
+	// deletion transaction. This guard also protects direct worker calls.
+	if err := retentionRequireExternallyVerifiedSourceArchive(); err != nil {
+		if stats != nil {
+			stats.HaltReason = err.Error()
+		}
+		return 0
+	}
 	query := retentionArchiveQueryV2(target)
 	var total int64
 	batchLimit := retentionV2InitialBatch(target)

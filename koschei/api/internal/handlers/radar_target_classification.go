@@ -98,8 +98,20 @@ func classifyRadarAccountObservation(account *services.SolanaAccountInfo) radarT
 		out.ParsedType = ""
 	}
 	info := radarTargetMap(parsed["info"])
+	// jsonParsed.type alone is not proof of account type. A mint or token
+	// account must be owned by the SPL Token or Token-2022 program and must
+	// not be executable. Reuse the canonical owner allowlist; inconsistent
+	// observations are UNKNOWN, never accepted as a mint.
+	verifiedTokenOwner := mintOwnerProgramEvidence(out.AccountOwner)["mint_owner_program_evidence_status"] == "verified"
 
 	switch {
+	case out.Executable:
+		out.Type = radarTargetProgram
+		out.Status = "verified_rpc_observation"
+		out.Evidence = "Executable Solana program account verified; token-mint scoring is not applicable."
+	case (out.ParsedType == "mint" || out.ParsedType == "account") && !verifiedTokenOwner:
+		out.Status = "owner_program_mismatch"
+		out.Evidence = "Parsed token account type conflicts with the RPC account owner; SPL Token or Token-2022 ownership could not be verified."
 	case out.ParsedType == "mint":
 		out.Type = radarTargetTokenMint
 		out.Status = "verified_rpc_observation"
@@ -109,10 +121,6 @@ func classifyRadarAccountObservation(account *services.SolanaAccountInfo) radarT
 		out.Status = "verified_rpc_observation"
 		out.TokenOwnerWallet = radarTargetString(info["owner"])
 		out.Evidence = "Parsed SPL token account verified; this is a holder account, not a token mint."
-	case out.Executable:
-		out.Type = radarTargetProgram
-		out.Status = "verified_rpc_observation"
-		out.Evidence = "Executable Solana program account verified; token-mint scoring is not applicable."
 	case out.AccountOwner == arvisUpgradeableLoaderID:
 		out.LoaderState = radarUpgradeableLoaderState(account.Data)
 		switch out.LoaderState {
@@ -129,6 +137,11 @@ func classifyRadarAccountObservation(account *services.SolanaAccountInfo) radarT
 			out.Status = "verified_rpc_observation"
 			out.Evidence = "Upgradeable-loader-owned account verified, but its loader state could not be resolved safely."
 		}
+	case verifiedTokenOwner:
+		// A token-program-owned account with unparsed/unrecognized data is not
+		// automatically a wallet: its account type remains unresolved.
+		out.Status = "token_account_type_unresolved"
+		out.Evidence = "Token-program ownership was verified, but the token account type could not be verified."
 	default:
 		out.Type = radarTargetWallet
 		out.Status = "verified_rpc_observation"

@@ -45,7 +45,7 @@ async function widgetScenario(response, scriptAttributes) {
 }
 
 test('widget never fabricates risk grade on network failure', async () => {
-  for (const response of [new Error('offline'), null, { ok: false }, {ok:true, signed:false, grade:'A', risk_index:9,risk_level:'low'}]) {
+  for (const response of [new Error('offline'), null, { ok: false }, {ok:false,error:'real_data_unavailable',signed:false,grade:'-',risk_index:0,risk_level:'unknown'}, {ok:true,signed:false,grade:'A',risk_index:9,risk_level:'low'}, {ok:true,signed:true,signature:'',grade:'A',risk_index:0,risk_level:'low'}]) {
     const { html, fetched } = await widgetScenario(response);
     assert.match(fetched, /^https:\/\/api\.koschei\.example\/api\/v1\/risk\/badge\?/);
     assert.match(html, /Unknown/);

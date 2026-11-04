@@ -17998,9 +17998,38 @@
     },
     "/api/v1/risk/badge": {
       "get": {
-        "description": "Registered boot-chain operation. Required evidence that cannot be produced yields a successful withheld result rather than an inferred verdict.",
+        "description": "Public Solana token-mint badge. A verified final grade is not currently available from the legacy ARVIS compatibility adapter. A missing or unverifiable assessment returns HTTP 503 with signed=false, grade='-' and risk_index=null; it must not be treated as an A/low-risk verdict. Invalid addresses return 400 and verified non-mint targets return 422. The badge is disabled by default.",
         "operationId": "get__api_v1_risk_badge",
-        "parameters": [],
+        "parameters": [
+          {
+            "description": "Solana token mint address. Supply address or its legacy alias token.",
+            "in": "query",
+            "name": "address",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Legacy alias for address; used only when address is absent or blank.",
+            "in": "query",
+            "name": "token",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Network selector; defaults to solana-mainnet. Network-specific verification must be satisfied before any grade is published.",
+            "in": "query",
+            "name": "network",
+            "required": false,
+            "schema": {
+              "default": "solana-mainnet",
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -18010,7 +18039,7 @@
                 }
               }
             },
-            "description": "Evidence-backed result, including valid WITHHOLD outcomes."
+            "description": "Reserved for a future independently verified, signed canonical badge result; not provided by the current compatibility adapter."
           },
           "400": {
             "content": {
@@ -18032,6 +18061,16 @@
             },
             "description": "Method not allowed."
           },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Verified target is not a Solana token mint; no risk grade is issued."
+          },
           "429": {
             "content": {
               "application/json": {
@@ -18051,6 +18090,16 @@
               }
             },
             "description": "Internal failure; no unsupported verdict is emitted."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Feature disabled or verifiable token-mint evidence/canonical signed final unavailable; the result is UNKNOWN, not a safety grade."
           }
         },
         "security": [],

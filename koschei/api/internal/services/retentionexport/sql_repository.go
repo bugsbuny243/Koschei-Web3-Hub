@@ -63,7 +63,8 @@ func (r *SQLRepository) LoadPending(ctx context.Context, limit int) ([]ArchiveRo
 	queryCtx, cancel := operationContext(ctx)
 	defer cancel()
 	rows, err := r.db.QueryContext(queryCtx, `
-		SELECT id,run_id::text,source_table,source_id,row_checksum,payload::text,archived_at
+		SELECT id,run_id::text,source_table,source_id,row_checksum,payload::text,archived_at,
+		       row_checksum=encode(sha256(convert_to(payload::text,'UTF8')),'hex') AS checksum_valid
 		FROM radar_retention_archive
 		WHERE exported_at IS NULL
 		ORDER BY archived_at ASC,id ASC
@@ -76,8 +77,14 @@ func (r *SQLRepository) LoadPending(ctx context.Context, limit int) ([]ArchiveRo
 	for rows.Next() {
 		var row ArchiveRow
 		var payload []byte
-		if err := rows.Scan(&row.ID, &row.RunID, &row.SourceTable, &row.SourceID, &row.RowChecksum, &payload, &row.ArchivedAt); err != nil {
+		var checksumValid bool
+		if err := rows.Scan(&row.ID, &row.RunID, &row.SourceTable, &row.SourceID, &row.RowChecksum, &payload, &row.ArchivedAt, &checksumValid); err != nil {
 			return nil, err
+		}
+		if !checksumValid {
+			// Never export corrupted staging rows or expose their contents.
+			// PostgreSQL jsonb::text defines the canonical row checksum.
+			return nil, fmt.Errorf("pending retention archive checksum mismatch")
 		}
 		row.Payload = append(json.RawMessage(nil), payload...)
 		result = append(result, row)
@@ -112,6 +119,7 @@ func (r *SQLRepository) MarkExported(ctx context.Context, runID string, rows []A
 			FROM expected e
 			WHERE a.id=e.id
 			  AND a.row_checksum=e.row_checksum
+			  AND a.row_checksum=encode(sha256(convert_to(a.payload::text,'UTF8')),'hex')
 			  AND a.exported_at IS NULL
 			RETURNING a.id
 		)
@@ -136,7 +144,13 @@ func (r *SQLRepository) FinishRun(ctx context.Context, runID string, result Resu
 	errorMessage := ""
 	if runErr != nil {
 		status = "failed"
-		errorMessage = runErr.Error()
+		// Provider/SDK errors may contain full endpoint URLs, request bodies,
+		// temporary tokens, or signed query strings. Persist only fixed codes;
+		// quantitative mismatch counters remain available for diagnostics.
+		errorMessage = "archive_export_failed"
+		if result.ChecksumMismatches > 0 {
+			errorMessage = "archive_export_checksum_mismatch"
+		}
 	}
 	detail, _ := json.Marshal(map[string]any{
 		"lock_acquired": result.LockAcquired,
