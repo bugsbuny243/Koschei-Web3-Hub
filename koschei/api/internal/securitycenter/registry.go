@@ -222,6 +222,9 @@ func Current() Snapshot {
 
 func preservedAssetBindings() []AssetBinding {
 	return []AssetBinding{
+		{Asset: "/js/arvis-telegram-v1.js", Kind: "notification-compatibility", State: "preserved_registered", Surface: "ARVIS Telegram compatibility inventory", Reason: "activation requires verified notification and authentication contracts"},
+		{Asset: "/js/owner-web3-lab.js", Kind: "owner-compatibility", State: "preserved_registered", Surface: "owner Web3 lab inventory", Reason: "not loaded until DOM and owner authorization contracts are verified"},
+		{Asset: "/js/professional-deep-scan-route.js", Kind: "scan-compatibility", State: "preserved_registered", Surface: "professional scan route inventory", Reason: "avoid co-execution with current scan and entitlement routes"},
 		{Asset: "/js/cipher.js", Kind: "visual-runtime", State: "active", Surface: "/fabric/security-center", Reason: "non-security presentation enhancement; now mounted on the security-center surface"},
 		{Asset: "/js/customer-command-universe-v2.js", Kind: "dashboard-runtime", State: "preserved_registered", Surface: "customer workspace compatibility inventory", Reason: "customer workspace v2 explicitly retires this DOM contract; preserved without co-execution so the active workspace contract remains authoritative"},
 		{Asset: "/js/early-access-v1.js", Kind: "customer-intake", State: "preserved_registered", Surface: "dedicated intake surface pending", Reason: "requires its own form contract; not injected into unrelated security workflows"},
