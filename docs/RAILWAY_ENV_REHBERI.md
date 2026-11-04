@@ -183,7 +183,54 @@ büyük alıcı) saatlik sınırla ve tekrar anahtarıyla güvenlik alarmı olur
 
 Durum: runtime health panelinde `worker.tron-flow-radar` (head, cursor, bekleyen blok).
 
+### 3.4 EVM Flow Radar (Ethereum, Base, Arbitrum, Optimism, Polygon, BNB — bellekte)
+
+Tron Flow Radar'ın EVM karşılığı. Seçilen her ağda, zincir başının birkaç blok gerisinden
+(reorg payı) her bloğun USDT/USDC `Transfer` loglarını `eth_getLogs` ile okur ve seed
+cüzdanlardan çıkan parayı adım adım takip eder. **ClickHouse gerekmez**; blok, transfer veya
+takip edilen adres veritabanına yazılmaz, yalnızca bulgular saatlik sınırla alarm olur.
+Açılışı etkilemez (🟢): RPC adresi eksik veya hatalı olan ağ atlanır, diğerleri çalışır.
+
+| Ağ | Takip edilen token | Kim dondurabilir | RPC değişkeni |
+|---|---|---|---|
+| `ethereum-mainnet` | USDT, USDC | Tether, Circle | `ETHEREUM_RPC_URL` |
+| `base-mainnet` | USDC (native) | Circle | `BASE_RPC_URL` |
+| `arbitrum-mainnet` | USDC (native) | Circle | `ARBITRUM_RPC_URL` |
+| `optimism-mainnet` | USDC (native) | Circle | `OPTIMISM_RPC_URL` |
+| `polygon-mainnet` | USDC (native) | Circle | `POLYGON_RPC_URL` |
+| `bnb-mainnet` | BSC-USD, USDC (Binance-Peg) | Token sözleşmesinde dondurma yok; yalnızca alıcı borsa/servis | `BNB_RPC_URL` |
+
+| Env | Not |
+|---|---|
+| `KOSCHEI_EVM_FLOW_RADAR_ENABLED=1` | Varsayılan kapalı; `1`, `true`, `yes` veya `on`. |
+| `KOSCHEI_EVM_FLOW_RADAR_NETWORKS` | Varsayılan `ethereum-mainnet`. Virgülle ekleyin. Desteklenmeyen ad loglanıp atlanır. |
+| `KOSCHEI_EVM_FLOW_RADAR_SEEDS` | Virgülle `0x...` seed cüzdanlar; tüm açık ağlara uygulanır. Her ağın aktif EVM watchlist cüzdanları 5 dakikada bir otomatik eklenir. |
+| `_MIN_FOLLOW_USD` (10000), `_MAX_HOPS` (4, en fazla 8) | Eşik USD cinsinden; 6 ve 18 ondalıklı stablecoin'ler aynı ölçeğe çevrilir. |
+| `_BURST_COUNT` (10) / `_BURST_WINDOW_SECONDS` (600) | Dağıtım tespiti; pencere ağın blok süresiyle bloğa çevrilir. |
+| `_FREEZE_CHECK_USD` (1000000) | Bu kadar takipli token alan adreste issuer kara liste durumu (`isBlackListed` / `isBlacklisted`) ve **güncel bakiye** okunur; yalnızca dondurulmamış ve bakiye hâlâ eşiğin üstündeyse bulgu. Okunamayan durum "dondurulmamış" sayılmaz, yeniden denenir. |
+| `_BRIDGE_ALERT_USD` (1000000) | Seed'e bağlı olmasa da sabitlenmiş köprüye giden tek büyük yatırım için bilgi bulgusu. |
+| `KOSCHEI_EVM_FLOW_RADAR_BRIDGES_JSON` | `{"0x...":{"label":"...","source":"https://...","networks":["ethereum-mainnet"]}}`. `networks` yoksa tüm ağlara uygulanır. Kaynağı https olmayan kayıt yok sayılır. |
+| `_MAX_TRACKED` (20000), `_MAX_FINDINGS_PER_HOUR` (30) | Ağ başına bellek ve alarm sınırları. |
+| `_POLL_SECONDS`, `_CONFIRMATIONS` | Boş bırakın: ağ başına varsayılan (yukarıdaki `.env.example` notu). |
+| `_MAX_BLOCK_RANGE` (10), `_MAX_RANGES_PER_CYCLE` (5), `_BACKFILL_BLOCKS` (0) | Ücretsiz sağlayıcı planları `eth_getLogs` aralığını çoğunlukla 10 blokla sınırlar; reddedilen aralık otomatik yarıya iner, sonra yeniden büyür. Ücretli planda aralığı ve poll süresini birlikte artırın. |
+
+**İstek maliyeti (varsayılanlarla, yaklaşık):** Ethereum ~6 bin, Base/Optimism/Polygon ağ başına
+~9 bin, BNB ~32 bin, Arbitrum ~86 bin istek/gün (`eth_blockNumber` + `eth_getLogs`; bakiye ve
+dondurma kontrolleri ayrıca az sayıda `eth_call`). Alchemy anahtarı Solana ile aynı kotayı
+paylaşıyorsa önce yalnızca `ethereum-mainnet` açın, kota durumunu izleyip ağ ekleyin.
+Alchemy panelinde ilgili ağların uygulamada açık olması gerekir.
+
+Durum: owner paneli → Security sekmesi → "EVM Flow Radar" kartı (`GET /api/owner/radar/evm-flow`),
+runtime health panelinde `worker.evm-flow-radar.<ağ>`. Her bulgu "Download package" ile imzalı
+kanıt paketi olarak indirilebilir (`GET /api/owner/radar/evm-flow/evidence`).
+
 ## 4. Sürekli küresel radar (ClickHouse) — ⚠️ fail-closed
+
+> **Not (Kasım 2026):** ClickHouse Cloud ücretsiz planı bitti ve ücretli plan kullanılmıyor.
+> Ağ çapında para takibi için ClickHouse **gerekmez**: Tron Flow Radar (3.3) ve EVM Flow Radar
+> (3.4) bellekte çalışır. Çalışan bir ClickHouse yokken aşağıdaki `*_CLICKHOUSE_ENABLED` ve
+> `*_HEAD_INGEST_ENABLED` bayraklarını **açmayın**: servis bilerek açılışta durur.
+> `CLICKHOUSE_*` değişkenleri bayraklar kapalıyken okunmaz; silmeye gerek yoktur.
 
 Sıra önemlidir. Her adımdan sonra deploy loglarında `CRITICAL` satırı olmadığını kontrol edin.
 
@@ -243,6 +290,11 @@ APTOS_REST_URL=
 
 # Radar adapter kaydı (tek satır JSON)
 RADAR_PROVIDERS_JSON=
+
+# Ağ çapında para takibi (bellekte, ClickHouse gerekmez)
+KOSCHEI_TRON_FLOW_RADAR_ENABLED=1
+KOSCHEI_EVM_FLOW_RADAR_ENABLED=1
+KOSCHEI_EVM_FLOW_RADAR_NETWORKS=ethereum-mainnet
 ```
 
 Bu aşamaya bilerek konmayanlar:

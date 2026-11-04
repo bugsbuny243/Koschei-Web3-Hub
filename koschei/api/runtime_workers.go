@@ -84,6 +84,7 @@ func startBackgroundRuntime(
 		stops = append(stops, services.StartGlobalRadarHeadIngest(ctx, *globalRadarHeadIngest))
 	}
 	stops = append(stops, startTronFlowRadar(ctx, db, runtimeHealth))
+	stops = append(stops, startEVMFlowRadars(ctx, db, runtimeHealth))
 	if db == nil {
 		log.Printf("PostgreSQL-backed background runtime not started: APP_DATABASE_URL is not configured")
 	} else {

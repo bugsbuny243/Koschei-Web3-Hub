@@ -40,8 +40,22 @@ type S3Sink struct {
 	now             func() time.Time
 }
 
+// normalizeS3Endpoint accepts the endpoint as providers display it: a bare
+// host such as "account.r2.cloudflarestorage.com" or host:port, optionally
+// wrapped in quotes. Without a scheme it assumes https, the scheme hosted
+// S3-compatible services use; url.Parse would otherwise read a bare host as a
+// path and the archive (and with it radar retention) would halt. An explicit
+// http:// or https:// is kept as given.
+func normalizeS3Endpoint(raw string) string {
+	value := strings.TrimSpace(strings.Trim(strings.TrimSpace(raw), `"'`))
+	if value != "" && !strings.Contains(value, "://") {
+		value = "https://" + value
+	}
+	return value
+}
+
 func NewS3Sink(config S3Config) (*S3Sink, error) {
-	endpoint, err := url.Parse(strings.TrimSpace(config.Endpoint))
+	endpoint, err := url.Parse(normalizeS3Endpoint(config.Endpoint))
 	if err != nil || endpoint.Scheme == "" || endpoint.Host == "" {
 		return nil, fmt.Errorf("valid KOSCHEI_RADAR_ARCHIVE_EXPORT_S3_ENDPOINT is required")
 	}
