@@ -1,3 +1,5 @@
+> **2026-11-04 v78 consolidation checkpoint:** Current Go runtime supports opt-in application persistence via `APP_DATABASE_URL` and `KOSCHEI_RUNTIME_ROLE=combined|api|worker`. Tron Flow Radar and evidence packages exist; persisted-evidence fallback is proposed in the accompanying PR. Active Response remains shadow/planning-only until a separately validated execution connector is implemented. The September checkpoint below is historical and does not describe the current main runtime.
+
 # Koschei Web3 Project State
 
 ## 2026-09-10 product-direction implementation candidate

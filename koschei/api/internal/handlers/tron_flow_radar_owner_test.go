@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -45,5 +47,12 @@ func TestOwnerTronFlowEvidencePackageNeedsARunningRadar(t *testing.T) {
 	(&Handler{}).OwnerTronFlowEvidencePackage(rec, httptest.NewRequest(http.MethodGet, "/api/owner/radar/tron-flow/evidence?finding=tron-flow:x", nil))
 	if rec.Code != http.StatusNotFound || !strings.Contains(rec.Body.String(), "tron_flow_radar_not_running") {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestPersistedTronFlowFindingNoStore(t *testing.T) {
+	_, err := (&Handler{}).persistedTronFlowFinding(context.Background(), "tron-flow:missing")
+	if !errors.Is(err, errTronFlowNoStore) {
+		t.Fatalf("expected no-store error, got %v", err)
 	}
 }

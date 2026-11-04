@@ -44,3 +44,22 @@ func TestLogLevelRoutingSeparatesFailuresFromProgress(t *testing.T) {
 		}
 	}
 }
+
+func TestLogZeroFailureCounters(t *testing.T) {
+	for _, tc := range []struct {
+		line    string
+		failure bool
+	}{
+		{"worker summary processed=25 failed=0 denied=0 unavailable=0", false},
+		{"worker summary error=0 failure=0 refused=0 halted=0", false},
+		{"worker summary processed=25 failed=2", true},
+		{"worker summary failed=0 connection refused", true},
+		{"worker summary failed=0.5", true},
+		{"worker summary failed=0.01", true},
+		{"worker summary failed=0.0 denied=0", false},
+	} {
+		if got := logLineIsFailure([]byte(tc.line)); got != tc.failure {
+			t.Errorf("logLineIsFailure(%q)=%v, want %v", tc.line, got, tc.failure)
+		}
+	}
+}
