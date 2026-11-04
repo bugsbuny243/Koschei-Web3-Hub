@@ -139,7 +139,9 @@ jobs:
       - name: Verify Tron Flow persisted evidence on PostgreSQL 17
         env:
           KOSCHEI_TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/koschei_release_gate?sslmode=disable
-        run: go test -v ./internal/handlers -run '^TestPersistedTronFlowFindingPostgres17        run: go test ./...
+        run: go test -v ./internal/handlers -run '^TestPersistedTronFlowFindingPostgres17$' -count=1
+      - name: Test all packages
+        run: go test ./...
       - name: Race-test July consolidation packages
         run: go test -race ./internal/handlers ./internal/services ./internal/defense
       - name: Vet all packages
