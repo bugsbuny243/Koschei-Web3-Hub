@@ -76,6 +76,8 @@ class Node {
  removeAttribute(name){delete this.attrs[name];}
  focus(){this.focused=true;}
  replaceChildren(...nodes){this.children=nodes;}
+ append(...nodes){this.children.push(...nodes);}
+ contains(node){return this.children.includes(node);}
 }
 function harness(fetch,search='',shared=false){
  const ids=['customerUniversalScan','customerUniversalScanForm','customerUniversalTarget','customerUniversalNetwork','customerUniversalSubmit','customerUniversalCancel','customerUniversalStatus','customerUniversalResultsWrap','customerUniversalOverview','customerUniversalResults','customerUniversalRecovery','advancedTools'];
@@ -586,4 +588,34 @@ for(const status of ['signature_history_failed','investigation_failed','not_inve
  const html=await renderCompleted(report);
  assert.match(html,/<b>UNKNOWN\.<\/b>/);
  assert.doesNotMatch(html,/Oldest funding found|First funding:/);
+});
+
+test('an EVM wallet scan offers one-tap live monitoring that adds it to the watchlist',async()=>{
+ const calls=[];
+ const h=harness(async(url,options)=>{calls.push({url,options});
+   if(url==='/api/watchlist')return response(201,{ok:true,created:true});
+   return response(200,envelope(evm,'base-mainnet'));});
+ h.submit(evm,'base-mainnet');await settle();
+ const watch=h.nodes.customerUniversalRecovery.children.find(n=>/Watch this wallet live/.test(n.textContent));
+ assert.ok(watch,'watch button offered');
+ watch.dispatch('click');for(let i=0;i<3;i++)await settle();
+ const post=calls.find(c=>c.url==='/api/watchlist');
+ assert.deepEqual(JSON.parse(post.options.body).target_type,'wallet');
+ assert.equal(JSON.parse(post.options.body).network,'base-mainnet');
+ assert.match(h.nodes.customerUniversalStatus.textContent,/checked every minute/);
+ assert.match(watch.textContent,/Monitoring on/);
+});
+test('a Solana token report offers token monitoring; an unconfigured network says so',async()=>{
+ const id='12345678-1234-1234-1234-123456789abc',report=readableFixture();report.modules=[{module:'fixture',module_id:'fixture',signed:true,evidence:[]}];
+ const h=harness(async(url)=>{
+   if(url==='/api/scan')return response(200,envelope(sol,'solana-mainnet'));
+   if(url==='/api/v1/radar/jobs')return response(201,{job_id:id,poll_url:'/api/v1/radar/jobs/'+id,canonical_engine:true});
+   if(url==='/api/watchlist')return response(503,{error:'evm_rpc_not_configured'});
+   return response(200,{id,job_type:'canonical_investigation',status:'completed',target:sol,network:'solana-mainnet',result:report});
+ });
+ h.submit(sol,'solana-mainnet');for(let i=0;i<5;i++)await settle();
+ const watch=h.nodes.customerUniversalRecovery.children.find(n=>/Watch this token/.test(n.textContent));
+ assert.ok(watch,'token watch offered once the report shows a token');
+ watch.dispatch('click');for(let i=0;i<3;i++)await settle();
+ assert.match(h.nodes.customerUniversalStatus.textContent,/not configured yet/);
 });
