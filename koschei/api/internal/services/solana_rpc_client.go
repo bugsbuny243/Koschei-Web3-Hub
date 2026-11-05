@@ -331,10 +331,10 @@ func solanaRPCDo[T any](ctx context.Context, rpcURL, method string, params any) 
 			if attempt < maxRetries {
 				continue
 			}
-			return zero, fmt.Errorf("solana rpc http status %d: %s", res.StatusCode, string(body))
+			return zero, fmt.Errorf("solana rpc http status %d", res.StatusCode)
 		}
 		if res.StatusCode < 200 || res.StatusCode >= 300 {
-			return zero, fmt.Errorf("solana rpc http status %d: %s", res.StatusCode, string(body))
+			return zero, fmt.Errorf("solana rpc http status %d", res.StatusCode)
 		}
 
 		var out solanaRPCResponse[T]
