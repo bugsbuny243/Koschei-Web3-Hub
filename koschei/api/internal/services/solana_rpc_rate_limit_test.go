@@ -121,3 +121,28 @@ func TestSharedCooldownBlocksNextWorker(t *testing.T) {
 		t.Fatalf("shared cooldown was not honored: elapsed=%s", elapsed)
 	}
 }
+
+func TestSolanaRPCProviderHTTPErrorDoesNotLeakResponseBody(t *testing.T) {
+	for _, status := range []int{http.StatusTooManyRequests, http.StatusInternalServerError} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			resetSolanaRPCCachesForTest()
+			t.Setenv("APP_ENV", "test")
+			t.Setenv("SOLANA_RPC_MIN_INTERVAL_MS", "0")
+			t.Setenv("SOLANA_RPC_MAX_429_RETRIES", "0")
+			t.Setenv("SOLANA_RPC_429_BACKOFF_MS", "1")
+			const secret = "private-provider-token-do-not-log"
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(status)
+				_, _ = w.Write([]byte(secret))
+			}))
+			defer server.Close()
+			_, err := SolanaGetSignaturesForAddress(context.Background(), server.URL, "address", 1)
+			if err == nil || !strings.Contains(err.Error(), http.StatusText(status)) && !strings.Contains(err.Error(), "http status") {
+				t.Fatalf("expected sanitized HTTP status error, got %v", err)
+			}
+			if strings.Contains(err.Error(), secret) {
+				t.Fatalf("provider response body leaked into error")
+			}
+		})
+	}
+}
