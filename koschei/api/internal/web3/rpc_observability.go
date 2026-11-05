@@ -68,8 +68,13 @@ func LogRPCFailure(method, endpoint string, statusCode int, err error) {
 	if message == "" {
 		message = "rpc request failed"
 	}
+	prefix := "solana rpc failure"
+	if RPCFailureKind(statusCode, err) == "canceled" {
+		prefix = "solana rpc canceled"
+	}
 	log.Printf(
-		"solana rpc event kind=%s method=%s provider=%s http_class=%s status=%d error=%s",
+		"%s kind=%s method=%s provider=%s http_class=%s status=%d error=%s",
+		prefix,
 		RPCFailureKind(statusCode, err),
 		method,
 		RPCProviderHost(endpoint),
