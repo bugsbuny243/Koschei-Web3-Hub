@@ -44,9 +44,9 @@ func TestCanonicalPumpSelectiveSchedulingRequiresPumpGate(t *testing.T) {
 
 func TestCanonicalPumpCycleDelayBacksOffAndRecovers(t *testing.T) {
 	for _, tc := range []struct {
-		poll time.Duration
+		poll     time.Duration
 		failures int
-		want time.Duration
+		want     time.Duration
 	}{
 		{time.Minute, 0, time.Minute},
 		{time.Minute, 1, time.Minute},
