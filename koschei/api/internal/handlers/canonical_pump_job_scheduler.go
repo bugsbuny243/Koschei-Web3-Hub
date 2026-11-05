@@ -92,11 +92,12 @@ func canonicalPumpCycleDelay(poll time.Duration, failures int) time.Duration {
 	if failures <= 0 {
 		return poll
 	}
+	capDelay := max(poll, 10*time.Minute)
 	delay := max(poll, 30*time.Second)
-	for i := 1; i < failures && delay < 10*time.Minute; i++ {
-		delay = min(delay*2, 10*time.Minute)
+	for i := 1; i < failures && delay < capDelay; i++ {
+		delay = min(delay*2, capDelay)
 	}
-	return min(delay, 10*time.Minute)
+	return delay
 }
 
 func (s *canonicalPumpJobScheduler) RunOnce(ctx context.Context) (candidateCount, qualifiedCount, queuedCount int, err error) {
