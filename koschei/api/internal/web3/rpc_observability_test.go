@@ -1,6 +1,8 @@
 package web3
 
 import (
+	"context"
+	"fmt"
 	"bytes"
 	"errors"
 	"log"
@@ -35,5 +37,38 @@ func TestLogRPCFailureNeverLeaksAPIKey(t *testing.T) {
 		if !strings.Contains(text, expected) {
 			t.Fatalf("missing %q: %s", expected, text)
 		}
+	}
+}
+
+func TestRPCFailureKindDistinguishesCancellationAndProviderFailure(t *testing.T) {
+	cases := []struct {
+		status int
+		err error
+		want string
+	}{
+		{200, fmt.Errorf("wrapped: %w", context.Canceled), "canceled"},
+		{429, context.Canceled, "canceled"},
+		{429, errors.New("rate limited"), "throttled"},
+		{200, context.DeadlineExceeded, "timeout"},
+		{503, errors.New("unavailable"), "upstream_5xx"},
+		{403, errors.New("forbidden"), "upstream_4xx"},
+		{200, errors.New("invalid response"), "rpc_error"},
+	}
+	for _, tc := range cases {
+		if got := RPCFailureKind(tc.status, tc.err); got != tc.want {
+			t.Errorf("status=%d err=%v: got %q want %q", tc.status, tc.err, got, tc.want)
+		}
+	}
+}
+
+func TestCanceledRPCLogIsNotProviderFailure(t *testing.T) {
+	var out bytes.Buffer
+	previous := log.Writer()
+	log.SetOutput(&out)
+	defer log.SetOutput(previous)
+	LogRPCFailure("getSignaturesForAddress", "https://example.org/private-key", 200, context.Canceled)
+	message := out.String()
+	if !strings.Contains(message, "solana rpc canceled kind=canceled") || strings.Contains(message, "solana rpc failure") {
+		t.Fatalf("canceled request mislabeled as provider failure: %s", message)
 	}
 }
