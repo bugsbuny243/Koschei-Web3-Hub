@@ -1,10 +1,10 @@
 package web3
 
 import (
-	"context"
-	"fmt"
 	"bytes"
+	"context"
 	"errors"
+	"fmt"
 	"log"
 	"strings"
 	"testing"
