@@ -398,3 +398,19 @@ func TestTronFlowRadarCycleReadsSolidBlocksThroughTheAdapter(t *testing.T) {
 		t.Fatalf("provider failure must surface only a category, got %v", err)
 	}
 }
+
+func TestTronFlowCatchupDelayNeverHotLoops(t *testing.T) {
+	for _, tc := range []struct {
+		poll time.Duration
+		want time.Duration
+	}{
+		{0, 2 * time.Second},
+		{time.Second, 2 * time.Second},
+		{3 * time.Second, 3 * time.Second},
+		{60 * time.Second, 60 * time.Second},
+	} {
+		if got := tronFlowCatchupDelay(tc.poll); got != tc.want {
+			t.Errorf("catchup delay for poll=%s: got=%s want=%s", tc.poll, got, tc.want)
+		}
+	}
+}
