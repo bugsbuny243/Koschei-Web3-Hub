@@ -43,8 +43,8 @@ func TestLogRPCFailureNeverLeaksAPIKey(t *testing.T) {
 func TestRPCFailureKindDistinguishesCancellationAndProviderFailure(t *testing.T) {
 	cases := []struct {
 		status int
-		err error
-		want string
+		err    error
+		want   string
 	}{
 		{200, fmt.Errorf("wrapped: %w", context.Canceled), "canceled"},
 		{429, context.Canceled, "canceled"},
