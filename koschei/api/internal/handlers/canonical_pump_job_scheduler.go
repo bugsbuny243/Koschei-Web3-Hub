@@ -65,17 +65,39 @@ func (s *canonicalPumpJobScheduler) Start(ctx context.Context) {
 	}
 	timer := time.NewTimer(15 * time.Second)
 	defer timer.Stop()
+	var failures int
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-timer.C:
-			if _, _, _, err := s.RunOnce(ctx); err != nil && ctx.Err() == nil {
-				log.Printf("canonical pump job scheduler cycle failed: %v", err)
+			_, _, _, err := s.RunOnce(ctx)
+			if ctx.Err() != nil {
+				return
 			}
-			timer.Reset(s.PollEvery)
+			if err != nil {
+				failures++
+				log.Printf("canonical pump job scheduler cycle failed: %v", err)
+			} else {
+				failures = 0
+			}
+			timer.Reset(canonicalPumpCycleDelay(s.PollEvery, failures))
 		}
 	}
+}
+
+// canonicalPumpCycleDelay prevents repeated provider failures from polling at
+// the normal cadence. Recovery resets the delay; it never shortens PollEvery.
+func canonicalPumpCycleDelay(poll time.Duration, failures int) time.Duration {
+	if failures <= 0 {
+		return poll
+	}
+	capDelay := max(poll, 10*time.Minute)
+	delay := max(poll, 30*time.Second)
+	for i := 1; i < failures && delay < capDelay; i++ {
+		delay = min(delay*2, capDelay)
+	}
+	return delay
 }
 
 func (s *canonicalPumpJobScheduler) RunOnce(ctx context.Context) (candidateCount, qualifiedCount, queuedCount int, err error) {

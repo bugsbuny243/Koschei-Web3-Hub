@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"testing"
+	"time"
 
 	"koschei/api/internal/services"
 )
@@ -38,5 +39,25 @@ func TestCanonicalPumpSelectiveSchedulingRequiresPumpGate(t *testing.T) {
 
 	if canonicalPumpAutoSchedulingAllowed() {
 		t.Fatal("selective Pump scheduling must fail closed when PUMP_HIGH_VOLUME_RADAR_ENABLED=false")
+	}
+}
+
+func TestCanonicalPumpCycleDelayBacksOffAndRecovers(t *testing.T) {
+	for _, tc := range []struct {
+		poll     time.Duration
+		failures int
+		want     time.Duration
+	}{
+		{time.Minute, 0, time.Minute},
+		{time.Minute, 1, time.Minute},
+		{time.Minute, 2, 2 * time.Minute},
+		{time.Minute, 3, 4 * time.Minute},
+		{time.Minute, 100, 10 * time.Minute},
+		{15 * time.Minute, 2, 15 * time.Minute},
+		{15 * time.Minute, 0, 15 * time.Minute},
+	} {
+		if got := canonicalPumpCycleDelay(tc.poll, tc.failures); got != tc.want {
+			t.Errorf("poll=%s failures=%d: got %s want %s", tc.poll, tc.failures, got, tc.want)
+		}
 	}
 }
