@@ -1,6 +1,8 @@
 package web3
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/url"
@@ -34,6 +36,27 @@ func RPCHTTPStatusClass(statusCode int) string {
 	return strconv.Itoa(statusCode/100) + "xx"
 }
 
+// RPCFailureKind separates caller cancellation from upstream throttling and
+// timeouts. A cancellation is not evidence that the provider failed.
+func RPCFailureKind(statusCode int, err error) string {
+	if errors.Is(err, context.Canceled) {
+		return "canceled"
+	}
+	if statusCode == 429 {
+		return "throttled"
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return "timeout"
+	}
+	if statusCode >= 500 {
+		return "upstream_5xx"
+	}
+	if statusCode >= 400 {
+		return "upstream_4xx"
+	}
+	return "rpc_error"
+}
+
 // LogRPCFailure emits provider-safe diagnostics. The raw endpoint is never
 // logged; error strings are scrubbed of URLs and query credentials.
 func LogRPCFailure(method, endpoint string, statusCode int, err error) {
@@ -46,7 +69,8 @@ func LogRPCFailure(method, endpoint string, statusCode int, err error) {
 		message = "rpc request failed"
 	}
 	log.Printf(
-		"solana rpc failure method=%s provider=%s http_class=%s status=%d error=%s",
+		"solana rpc event kind=%s method=%s provider=%s http_class=%s status=%d error=%s",
+		RPCFailureKind(statusCode, err),
 		method,
 		RPCProviderHost(endpoint),
 		RPCHTTPStatusClass(statusCode),
