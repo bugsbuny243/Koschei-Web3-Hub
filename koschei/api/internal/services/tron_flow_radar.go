@@ -790,6 +790,16 @@ func tronFlowCatchupDelay(poll time.Duration) time.Duration {
 	return max(poll, 2*time.Second)
 }
 
+// tronFlowFailureBackoff avoids retrying a quota-exhausted provider every five
+// seconds. Keep the existing exponential ceiling for all failure categories.
+func tronFlowFailureBackoff(previous time.Duration, err error) time.Duration {
+	wait := min(max(2*previous, 5*time.Second), 5*time.Minute)
+	if err != nil && strings.Contains(err.Error(), "tron_provider_http_429") {
+		wait = max(wait, time.Minute)
+	}
+	return wait
+}
+
 // Start runs the radar until ctx ends.
 func (r *TronFlowRadar) Start(ctx context.Context) func() {
 	if r.health != nil {
@@ -834,7 +844,7 @@ func (r *TronFlowRadar) Start(ctx context.Context) func() {
 			wait := r.cfg.Poll
 			if err != nil {
 				log.Printf("tron flow radar cycle failed: %v", err)
-				backoff = min(max(2*backoff, 5*time.Second), 5*time.Minute)
+				backoff = tronFlowFailureBackoff(backoff, err)
 				wait = backoff
 			} else {
 				backoff = 0
