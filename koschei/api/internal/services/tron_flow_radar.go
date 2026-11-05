@@ -784,6 +784,12 @@ func (r *TronFlowRadar) cycle(ctx context.Context) (int, error) {
 	return processed, nil
 }
 
+// tronFlowCatchupDelay prevents an unbounded hot loop while behind the head.
+// Keep the normal polling delay, with a minimum pause between full batches.
+func tronFlowCatchupDelay(poll time.Duration) time.Duration {
+	return max(poll, 2*time.Second)
+}
+
 // Start runs the radar until ctx ends.
 func (r *TronFlowRadar) Start(ctx context.Context) func() {
 	if r.health != nil {
@@ -832,8 +838,11 @@ func (r *TronFlowRadar) Start(ctx context.Context) func() {
 				wait = backoff
 			} else {
 				backoff = 0
+				// Catch-up still makes provider requests. Never spin at zero
+				// delay after a full batch: the next cycle reads the head and
+				// more block receipts, which can exhaust TronGrid quotas.
 				if processed >= r.cfg.MaxBlocks {
-					wait = 0 // still catching up
+					wait = tronFlowCatchupDelay(r.cfg.Poll)
 				}
 			}
 			select {
