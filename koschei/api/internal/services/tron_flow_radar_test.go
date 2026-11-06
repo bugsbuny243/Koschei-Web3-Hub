@@ -414,3 +414,23 @@ func TestTronFlowCatchupDelayNeverHotLoops(t *testing.T) {
 		}
 	}
 }
+
+func TestTronFlowFailureBackoffRespectsProviderQuota(t *testing.T) {
+	cases := []struct {
+		previous time.Duration
+		err      error
+		want     time.Duration
+	}{
+		{0, fmt.Errorf("tron_provider_http_429"), time.Minute},
+		{5 * time.Second, fmt.Errorf("tron_provider_http_429"), time.Minute},
+		{time.Minute, fmt.Errorf("tron_provider_http_429"), 2 * time.Minute},
+		{5 * time.Minute, fmt.Errorf("tron_provider_http_429"), 5 * time.Minute},
+		{0, fmt.Errorf("tron_provider_http_500"), 5 * time.Second},
+		{5 * time.Second, fmt.Errorf("tron_provider_http_500"), 10 * time.Second},
+	}
+	for _, tc := range cases {
+		if got := tronFlowFailureBackoff(tc.previous, tc.err); got != tc.want {
+			t.Errorf("previous=%s err=%v: got=%s want=%s", tc.previous, tc.err, got, tc.want)
+		}
+	}
+}
