@@ -59,8 +59,8 @@ const (
 	neonJWTFailureInvalidSignature  neonJWTFailureCategory = "invalid_signature"
 	neonJWTFailureUnknown           neonJWTFailureCategory = "unknown"
 
-	jwksCacheTTL    = 5 * time.Minute
-	jwksNegativeTTL = 30 * time.Second
+	jwksCacheTTL           = 5 * time.Minute
+	jwksNegativeTTL        = 30 * time.Second
 	jwksMinRefreshInterval = 10 * time.Second
 )
 
