@@ -221,12 +221,18 @@ func markDeliverySuccess(ctx context.Context, db *sql.DB, item deliveryRecord, s
 		return
 	}
 	defer tx.Rollback()
-	_, err = tx.ExecContext(ctx, `
+	result, err := tx.ExecContext(ctx, `
 		UPDATE webhook_deliveries
 		SET status='delivered',locked_at=NULL,last_http_status=$1,last_error=NULL,response_excerpt=$2,
 		    delivered_at=now(),updated_at=now()
-		WHERE id=$3`, status, excerpt, item.ID)
+		WHERE id=$3 AND status='processing' AND attempt_count=$4`, status, excerpt, item.ID, item.AttemptCount)
 	if err != nil {
+		return
+	}
+	changed, err := result.RowsAffected()
+	if err != nil || changed != 1 {
+		// A reclaimed lease belongs to a newer attempt; do not mutate its
+		// endpoint statistics or overwrite the newer delivery outcome.
 		return
 	}
 	_, err = tx.ExecContext(ctx, `
@@ -258,8 +264,14 @@ func markDeliveryFailure(ctx context.Context, db *sql.DB, item deliveryRecord, h
 		UPDATE webhook_deliveries
 		SET status=$1,locked_at=NULL,next_attempt_at=$2,last_http_status=$3,last_error=$4,
 		    response_excerpt=$5,updated_at=now()
-		WHERE id=$6`, status, nextAttempt, nullableStatus, truncate(message, 1000), excerpt, item.ID)
+		WHERE id=$6 AND status='processing' AND attempt_count=$7`, status, nextAttempt, nullableStatus, truncate(message, 1000), excerpt, item.ID, item.AttemptCount)
 	if err != nil {
+		return
+	}
+	changed, err := result.RowsAffected()
+	if err != nil || changed != 1 {
+		// A reclaimed lease belongs to a newer attempt; do not mutate its
+		// endpoint statistics or overwrite the newer delivery outcome.
 		return
 	}
 	_, err = tx.ExecContext(ctx, `
