@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net/url"
 	"strings"
 
 	"koschei/api/internal/services/retentionexport"
@@ -37,11 +36,7 @@ func retentionDurableExportPreflight() error {
 	if mode != "s3" {
 		return fmt.Errorf("autonomous retention requires S3 archive destination")
 	}
-	endpoint, err := url.Parse(config.S3Endpoint)
-	if err != nil || endpoint == nil || endpoint.Scheme != "https" || endpoint.Host == "" || endpoint.User != nil {
-		return fmt.Errorf("autonomous retention requires secure HTTPS S3 endpoint")
-	}
-	return nil
+	return retentionexport.ValidateDurableS3Endpoint(config.S3Endpoint)
 }
 
 func (w *securityRadarRetentionWorker) exportPendingArchive(ctx context.Context, phase string) error {
