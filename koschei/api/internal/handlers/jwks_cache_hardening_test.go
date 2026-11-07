@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"fmt"
 	"net/http/httptest"
 	"sync"
 	"sync/atomic"
@@ -16,6 +17,7 @@ func resetJWKSCacheForTest() {
 	defer jwksMu.Unlock()
 	jwksCache = nil
 	jwksCacheExpiresAt = time.Time{}
+	jwksLastRefreshAt = time.Time{}
 	jwksNegativeCache = map[string]time.Time{}
 }
 
@@ -108,5 +110,29 @@ func TestLoadJWKSKeyCoalescesConcurrentRefreshes(t *testing.T) {
 	}
 	if got := requests.Load(); got != 1 {
 		t.Fatalf("JWKS requests = %d; want 1 coalesced refresh", got)
+	}
+}
+
+func TestLoadJWKSKeyBoundsDistinctUnknownKidRefreshes(t *testing.T) {
+	resetJWKSCacheForTest()
+	t.Cleanup(resetJWKSCacheForTest)
+	var requests atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"keys":[{"kid":"known","kty":"RSA","n":"AQ","e":"Aw"}]}`))
+	}))
+	defer server.Close()
+	t.Setenv("NEON_AUTH_JWKS_URL", server.URL)
+	for i := 0; i < 100; i++ {
+		if _, err := loadJWKSKey(fmt.Sprintf("unknown-%d", i)); err == nil {
+			t.Fatal("unknown key was accepted")
+		}
+	}
+	if got := requests.Load(); got != 1 {
+		t.Fatalf("100 distinct unknown kids triggered %d JWKS requests, want 1", got)
+	}
+	if key, err := loadJWKSKey("known"); err != nil || key.Kid != "known" {
+		t.Fatalf("known key must remain available from cache: key=%+v err=%v", key, err)
 	}
 }
