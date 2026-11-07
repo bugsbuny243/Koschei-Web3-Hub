@@ -243,3 +243,33 @@ func TestParseFreezeWordAndNormalization(t *testing.T) {
 		t.Fatal("FormatUnits mismatch")
 	}
 }
+
+func TestFlowClientChainIDRejectsInvalidProviderResponses(t *testing.T) {
+	for _, tc := range []struct {
+		name, result string
+		want uint64
+		invalid bool
+	}{
+		{"ethereum", `"0x1"`, 1, false},
+		{"base", `"0x2105"`, 8453, false},
+		{"zero", `"0x0"`, 0, true},
+		{"malformed", `"not-hex"`, 0, true},
+		{"non-string", `8453`, 0, true},
+		{"null", `null`, 0, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				var request struct { Method string `json:"method"` }
+				if err := json.NewDecoder(r.Body).Decode(&request); err != nil || request.Method != "eth_chainId" {
+					t.Errorf("unexpected RPC request: method=%s err=%v", request.Method, err)
+				}
+				_, _ = fmt.Fprintf(w, `{"jsonrpc":"2.0","id":1,"result":%s}`, tc.result)
+			}))
+			defer server.Close()
+			got, err := (FlowClient{URL: server.URL}).ChainID(context.Background())
+			if tc.invalid && err == nil || !tc.invalid && (err != nil || got != tc.want) {
+				t.Fatalf("ChainID=%d err=%v, want=%d invalid=%t", got, err, tc.want, tc.invalid)
+			}
+		})
+	}
+}
