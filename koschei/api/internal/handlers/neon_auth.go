@@ -81,7 +81,7 @@ func (e neonJWTVerificationError) Unwrap() error { return e.Cause }
 var (
 	jwksCache          map[string]neonJWK
 	jwksCacheExpiresAt time.Time
-	jwksLastRefreshAt time.Time
+	jwksLastRefreshAt  time.Time
 	jwksNegativeCache  = map[string]time.Time{}
 	jwksMu             sync.RWMutex
 	jwksRefreshMu      sync.Mutex
