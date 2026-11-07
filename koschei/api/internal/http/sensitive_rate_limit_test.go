@@ -308,3 +308,23 @@ func TestPublicApprovalScanUsesSharedRateLimit(t *testing.T) {
 		t.Fatal("approval scan must share the universal scan rate policy")
 	}
 }
+
+func TestLegacyPaidRouteRequiresAppProfileStore(t *testing.T) {
+	entitlementDB, err := sql.Open("postgres", "postgres://unused:unused@127.0.0.1:1/unused?sslmode=disable")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer entitlementDB.Close()
+	called := false
+	handler := apiReadinessWithEntitlement(nil, entitlementDB, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	for _, path := range []string{"/api/token/scan", "/api/arvis/preflight"} {
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, path, nil))
+		if response.Code != http.StatusServiceUnavailable || called {
+			t.Fatalf("%s: missing app profile store must fail closed, status=%d called=%v", path, response.Code, called)
+		}
+	}
+}
