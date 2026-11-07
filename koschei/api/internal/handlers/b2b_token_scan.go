@@ -243,13 +243,20 @@ func (h *Handler) runB2BTokenScan(requestID, network, mint string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	result, err := h.scanCustomerToken(ctx, network, mint)
+	// Finalization must outlive a timed-out RPC; using ctx here would leave
+	// reserved credits stranded when the scan reaches its deadline.
+	finalizeCtx, finalizeCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer finalizeCancel()
 	if err != nil {
-		h.refundAPICredits(ctx, requestID, "rpc_scan_failed")
+		h.refundAPICredits(finalizeCtx, requestID, "rpc_scan_failed")
 		return
 	}
 	payload, _ := json.Marshal(result)
-	_, _ = h.DB.ExecContext(ctx, `UPDATE api_usage_events SET metadata=$1::jsonb WHERE request_id=$2`, string(payload), requestID)
-	h.finalizeAPIUsage(ctx, requestID, int(time.Since(start).Milliseconds()))
+	if _, err := h.DB.ExecContext(finalizeCtx, `UPDATE api_usage_events SET metadata=$1::jsonb WHERE request_id=$2 AND status='reserved'`, string(payload), requestID); err != nil {
+		h.refundAPICredits(finalizeCtx, requestID, "scan_result_persist_failed")
+		return
+	}
+	h.finalizeAPIUsage(finalizeCtx, requestID, int(time.Since(start).Milliseconds()))
 }
 
 func (h *Handler) runB2BTokenBatch(requestID, network string, mints []string) {
