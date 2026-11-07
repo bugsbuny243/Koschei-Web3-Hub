@@ -247,8 +247,8 @@ func TestParseFreezeWordAndNormalization(t *testing.T) {
 func TestFlowClientChainIDRejectsInvalidProviderResponses(t *testing.T) {
 	for _, tc := range []struct {
 		name, result string
-		want uint64
-		invalid bool
+		want         uint64
+		invalid      bool
 	}{
 		{"ethereum", `"0x1"`, 1, false},
 		{"base", `"0x2105"`, 8453, false},
@@ -259,7 +259,9 @@ func TestFlowClientChainIDRejectsInvalidProviderResponses(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				var request struct { Method string `json:"method"` }
+				var request struct {
+					Method string `json:"method"`
+				}
 				if err := json.NewDecoder(r.Body).Decode(&request); err != nil || request.Method != "eth_chainId" {
 					t.Errorf("unexpected RPC request: method=%s err=%v", request.Method, err)
 				}
