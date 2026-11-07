@@ -988,11 +988,11 @@ func (r *EVMFlowRadar) cycle(ctx context.Context) (int, bool, error) {
 	// reading the head or advancing the cursor under a misleading chain label.
 	expectedChainIDs := map[string]uint64{
 		"ethereum-mainnet": 1,
-		"base-mainnet": 8453,
+		"base-mainnet":     8453,
 		"optimism-mainnet": 10,
 		"arbitrum-mainnet": 42161,
-		"polygon-mainnet": 137,
-		"bnb-mainnet": 56,
+		"polygon-mainnet":  137,
+		"bnb-mainnet":      56,
 	}
 	expected, ok := expectedChainIDs[r.cfg.Network]
 	if !ok {
