@@ -260,7 +260,7 @@ func markDeliveryFailure(ctx context.Context, db *sql.DB, item deliveryRecord, h
 	if httpStatus > 0 {
 		nullableStatus = httpStatus
 	}
-	_, err = tx.ExecContext(ctx, `
+	result, err := tx.ExecContext(ctx, `
 		UPDATE webhook_deliveries
 		SET status=$1,locked_at=NULL,next_attempt_at=$2,last_http_status=$3,last_error=$4,
 		    response_excerpt=$5,updated_at=now()
