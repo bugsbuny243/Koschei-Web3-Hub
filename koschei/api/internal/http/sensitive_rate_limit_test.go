@@ -298,3 +298,13 @@ func cleanupSharedRateLimitTestBucket(t *testing.T, db *sql.DB, keyHash, route s
 		t.Fatalf("cleanup shared rate limit bucket: %v", err)
 	}
 }
+
+func TestPublicApprovalScanUsesSharedRateLimit(t *testing.T) {
+	rule, ok := sensitiveRuleForPath("/api/scan/approval")
+	if !ok || rule.Limit != 10 || rule.Window != time.Minute {
+		t.Fatalf("approval scan must have a 10/minute shared budget: rule=%+v ok=%v", rule, ok)
+	}
+	if rule != (sensitiveLimitRule{Limit: 10, Window: time.Minute}) {
+		t.Fatal("approval scan must share the universal scan rate policy")
+	}
+}
