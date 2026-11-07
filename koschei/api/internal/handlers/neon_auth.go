@@ -61,6 +61,7 @@ const (
 
 	jwksCacheTTL    = 5 * time.Minute
 	jwksNegativeTTL = 30 * time.Second
+	jwksMinRefreshInterval = 10 * time.Second
 )
 
 type neonJWTVerificationError struct {
@@ -80,6 +81,7 @@ func (e neonJWTVerificationError) Unwrap() error { return e.Cause }
 var (
 	jwksCache          map[string]neonJWK
 	jwksCacheExpiresAt time.Time
+	jwksLastRefreshAt time.Time
 	jwksNegativeCache  = map[string]time.Time{}
 	jwksMu             sync.RWMutex
 	jwksRefreshMu      sync.Mutex
@@ -295,6 +297,13 @@ func loadJWKSKey(kid string) (neonJWK, error) {
 			return neonJWK{}, errors.New("unknown key")
 		}
 	}
+	// Unknown distinct kids must not trigger one provider fetch each. A fresh
+	// cache permits one bounded refresh per interval for legitimate rotation.
+	// Expired caches still refresh immediately to avoid serving removed keys.
+	if now.Before(jwksCacheExpiresAt) && now.Sub(jwksLastRefreshAt) < jwksMinRefreshInterval {
+		jwksMu.RUnlock()
+		return neonJWK{}, errors.New("unknown key")
+	}
 	jwksMu.RUnlock()
 
 	jwksURL := strings.TrimSpace(configuredNeonAuthJWKSURL())
@@ -334,6 +343,7 @@ func loadJWKSKey(kid string) (neonJWK, error) {
 	jwksMu.Lock()
 	jwksCache = cache
 	jwksCacheExpiresAt = refreshedAt.Add(jwksCacheTTL)
+	jwksLastRefreshAt = refreshedAt
 	for missedKid, until := range jwksNegativeCache {
 		if !refreshedAt.Before(until) {
 			delete(jwksNegativeCache, missedKid)
