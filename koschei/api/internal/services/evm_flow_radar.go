@@ -984,6 +984,27 @@ func (r *EVMFlowRadar) tokenAddresses() []string {
 // and retried; after a run of successes the range grows back. It returns the
 // number of blocks processed and whether the cursor reached the head.
 func (r *EVMFlowRadar) cycle(ctx context.Context) (int, bool, error) {
+	// Validate every cycle, including after an RPC provider failover, before
+	// reading the head or advancing the cursor under a misleading chain label.
+	expectedChainIDs := map[string]uint64{
+		"ethereum-mainnet": 1,
+		"base-mainnet":     8453,
+		"optimism-mainnet": 10,
+		"arbitrum-mainnet": 42161,
+		"polygon-mainnet":  137,
+		"bnb-mainnet":      56,
+	}
+	expected, ok := expectedChainIDs[r.cfg.Network]
+	if !ok {
+		return 0, false, errors.New("evm_flow_unknown_network")
+	}
+	actual, err := r.client.ChainID(ctx)
+	if err != nil {
+		return 0, false, err
+	}
+	if actual != expected {
+		return 0, false, errors.New("evm_flow_provider_chain_id_mismatch")
+	}
 	latest, err := r.client.BlockNumber(ctx)
 	if err != nil {
 		return 0, false, err

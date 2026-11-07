@@ -192,9 +192,29 @@ func ensureCanonicalPlans(db *sql.DB) error {
 }
 
 func runMigrations(db *sql.DB) (int, int, error) {
+	// A session-level advisory lock serializes migrations across API replicas.
+	// Keep every migration transaction on this pinned connection until unlock.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer conn.Close()
+	const migrationLockKey int64 = 0x4b4f5343484549
+	if _, err := conn.ExecContext(ctx, "SELECT pg_advisory_lock($1)", migrationLockKey); err != nil {
+		return 0, 0, fmt.Errorf("acquire migration lock: %w", err)
+	}
+	defer func() {
+		unlockCtx, unlockCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer unlockCancel()
+		if _, err := conn.ExecContext(unlockCtx, "SELECT pg_advisory_unlock($1)", migrationLockKey); err != nil {
+			log.Printf("migration advisory unlock failed: %v", err)
+		}
+	}()
 	applied := 0
 	skipped := 0
-	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS schema_migrations (version text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())`); err != nil {
+	if _, err := conn.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (version text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())`); err != nil {
 		return 0, 0, err
 	}
 	files, err := migrationSQLFiles()
@@ -210,12 +230,12 @@ func runMigrations(db *sql.DB) (int, int, error) {
 		if err != nil {
 			return applied, skipped, err
 		}
-		tx, err := db.Begin()
+		tx, err := conn.BeginTx(ctx, nil)
 		if err != nil {
 			return applied, skipped, err
 		}
 		var exists bool
-		if err := tx.QueryRow(`SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version=$1)`, v).Scan(&exists); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version=$1)`, v).Scan(&exists); err != nil {
 			_ = tx.Rollback()
 			return applied, skipped, err
 		}
@@ -227,11 +247,11 @@ func runMigrations(db *sql.DB) (int, int, error) {
 		// #nosec G701 -- SQL is read only from version-controlled migration files
 		// packaged with the application; no request, database or operator string is
 		// interpolated into the migration contents at runtime.
-		if _, err := tx.Exec(string(b)); err != nil {
+		if _, err := tx.ExecContext(ctx, string(b)); err != nil {
 			_ = tx.Rollback()
 			return applied, skipped, fmt.Errorf("migration failed: %s %w", v, err)
 		}
-		if _, err := tx.Exec(`INSERT INTO schema_migrations (version) VALUES ($1)`, v); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO schema_migrations (version) VALUES ($1)`, v); err != nil {
 			_ = tx.Rollback()
 			return applied, skipped, err
 		}

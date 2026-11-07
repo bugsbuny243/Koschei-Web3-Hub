@@ -43,13 +43,13 @@ func apiReadinessWithEntitlement(db *sql.DB, entitlementDB *sql.DB, next http.Ha
 		path := r.URL.Path
 
 		if requiresProfessionalLegacyOperation(path) {
-			if entitlementDB == nil {
+			if db == nil || entitlementDB == nil {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusServiceUnavailable)
-				_ = json.NewEncoder(w).Encode(map[string]string{"error": "entitlement store unavailable"})
+				_ = json.NewEncoder(w).Encode(map[string]string{"error": "authorization store unavailable"})
 				return
 			}
-			access := &handlers.Handler{EntitlementDB: entitlementDB}
+			access := &handlers.Handler{DB: db, EntitlementDB: entitlementDB}
 			target := func(gw http.ResponseWriter, gr *http.Request) { protected.ServeHTTP(gw, gr) }
 			handlers.RequireAuth(access.RequirePlanTier("professional", access.EnforcePlanOutput(target)))(w, r)
 			return

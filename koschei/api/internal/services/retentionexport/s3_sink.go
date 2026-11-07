@@ -54,6 +54,16 @@ func normalizeS3Endpoint(raw string) string {
 	return value
 }
 
+// ValidateDurableS3Endpoint applies the sink's bare-host HTTPS normalization
+// while rejecting insecure or ambiguous destinations for retention preflight.
+func ValidateDurableS3Endpoint(raw string) error {
+	endpoint, err := url.Parse(normalizeS3Endpoint(raw))
+	if err != nil || endpoint == nil || endpoint.Scheme != "https" || endpoint.Host == "" || endpoint.User != nil || endpoint.Opaque != "" || endpoint.Fragment != "" || endpoint.RawQuery != "" {
+		return fmt.Errorf("autonomous retention requires secure HTTPS S3 endpoint")
+	}
+	return nil
+}
+
 func NewS3Sink(config S3Config) (*S3Sink, error) {
 	endpoint, err := url.Parse(normalizeS3Endpoint(config.Endpoint))
 	if err != nil || endpoint.Scheme == "" || endpoint.Host == "" {

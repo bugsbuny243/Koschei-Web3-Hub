@@ -173,6 +173,23 @@ func parseQuantity(raw string) (uint64, error) {
 	return strconv.ParseUint(raw[2:], 16, 64)
 }
 
+// ChainID returns the RPC endpoint's chain identity; invalid responses fail closed.
+func (c FlowClient) ChainID(ctx context.Context) (uint64, error) {
+	raw, err := c.call(ctx, "eth_chainId", []any{})
+	if err != nil {
+		return 0, err
+	}
+	var value string
+	if json.Unmarshal(raw, &value) != nil {
+		return 0, errors.New("evm_flow_provider_chain_id_invalid")
+	}
+	id, err := parseQuantity(value)
+	if err != nil || id == 0 {
+		return 0, errors.New("evm_flow_provider_chain_id_invalid")
+	}
+	return id, nil
+}
+
 // BlockNumber returns the provider's latest block number.
 func (c FlowClient) BlockNumber(ctx context.Context) (uint64, error) {
 	raw, err := c.call(ctx, "eth_blockNumber", []any{})
